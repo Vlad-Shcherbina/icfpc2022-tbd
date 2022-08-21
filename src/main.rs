@@ -1,4 +1,5 @@
 mod util;
+mod dashboard;
 
 crate::entry_point!("hello", hello);
 fn hello() {
