@@ -1,3 +1,5 @@
+mod util;
+
 crate::entry_point!("hello", hello);
 fn hello() {
     println!("hello");
