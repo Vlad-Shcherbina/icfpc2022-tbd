@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 linkme = "*"
 url = "*"
+askama = { version = "*", default-features = false }
