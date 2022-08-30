@@ -14,6 +14,16 @@ pub fn handler(req: Request, resp: ResponseBuilder) -> HandlerResult {
         let s = AjaxTemplate {}.render().unwrap();
         return resp.code("200 OK").body(s);
     }
+    if req.path == "foobar" {
+        assert_eq!(req.method, "POST");
+        let request: FoobarRequest = serde_json::from_str(std::str::from_utf8(req.body).unwrap()).unwrap();
+        let response = FoobarResponse {
+            s: "*".repeat(request.x),
+            y: 42,
+        };
+        let s = serde_json::to_string(&response).unwrap();
+        return resp.code("200 OK").body(s);
+    }
     resp.code("400 Not Found").body("not found")
 }
 
@@ -37,4 +47,17 @@ struct HelloTemplate<'a> {
 #[derive(Template)]
 #[template(path = "ajax.html")]
 struct AjaxTemplate {
+}
+
+// keep in sync with types.ts
+#[derive(serde::Deserialize)]
+struct FoobarRequest {
+    x: usize,
+}
+
+// keep in sync with types.ts
+#[derive(serde::Serialize)]
+struct FoobarResponse {
+    s: String,
+    y: i32,
 }

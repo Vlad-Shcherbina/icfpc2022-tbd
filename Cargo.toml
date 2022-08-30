@@ -9,3 +9,5 @@ edition = "2021"
 linkme = "*"
 url = "*"
 askama = { version = "*", default-features = false }
+serde = { version = "*", features = ["derive"] }
+serde_json = "*"
