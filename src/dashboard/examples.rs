@@ -10,6 +10,10 @@ pub fn handler(req: Request, resp: ResponseBuilder) -> HandlerResult {
         let s = HelloTemplate { name }.render().unwrap();
         return resp.code("200 OK").body(s);
     }
+    if req.path == "ajax" {
+        let s = AjaxTemplate {}.render().unwrap();
+        return resp.code("200 OK").body(s);
+    }
     resp.code("400 Not Found").body("not found")
 }
 
@@ -28,4 +32,9 @@ Hello, <b>{{ name }}</b>!
 "#)]
 struct HelloTemplate<'a> {
     name: &'a str,
+}
+
+#[derive(Template)]
+#[template(path = "ajax.html")]
+struct AjaxTemplate {
 }
