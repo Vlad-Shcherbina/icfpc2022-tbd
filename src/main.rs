@@ -2,6 +2,7 @@
 
 mod util;
 mod dashboard;
+mod db;
 
 crate::entry_point!("hello", hello);
 fn hello() {
