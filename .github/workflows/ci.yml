@@ -20,6 +20,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - run: sudo apt install -y lld
+
       - run: |
           rustup install nightly
           rustup default nightly
