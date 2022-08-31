@@ -11,3 +11,17 @@ url = "*"
 askama = { version = "*", default-features = false }
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
+
+[profile.dev.package."*"]
+opt-level = "s"
+debug = false
+
+[profile.dev]
+debug = 1
+
+[profile.release.package."*"]
+debug = false
+
+[profile.release]
+debug = 1
+incremental = true
