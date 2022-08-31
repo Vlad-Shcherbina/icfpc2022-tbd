@@ -5,30 +5,6 @@ use std::collections::HashMap;
 use std::net::{TcpListener, TcpStream};
 use std::io::{Read, Write};
 
-#[allow(dead_code)]
-// ENTRY_POINT
-pub fn dev_server_example() {
-    use std::sync::Mutex;
-
-    let state = Mutex::new(0);
-
-    let listener = TcpListener::bind("127.0.0.1:8000").unwrap();
-    eprintln!("serving at http://127.0.0.1:8000 ...");
-
-    serve_forever(listener, |req, resp| {
-        match req.path {
-            "/" => {
-                let mut cnt = state.lock().unwrap();
-                *cnt += 1;
-                resp.code("200 OK")
-                    .header("Content-Type", "text/html; charset=utf8")
-                    .body(format!("hello, <b>{}</b>!", *cnt))
-            }
-            _ => resp.code("404 Not Found").body("not found"),
-        }
-    })
-}
-
 pub fn serve_forever<H>(listener: TcpListener, handler: H) -> !
 where
     H: FnMut(Request, ResponseBuilder) -> HandlerResult,
