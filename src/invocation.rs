@@ -47,6 +47,8 @@ pub enum Status {
     Stopped,
 }
 
+/// Creates or updates current invocation.
+/// Returns invocation ID, it will be the same if called mutliple times.
 pub fn record_this_invocation(t: &mut Transaction, status: Status) -> i32 {
     let (delta_time, status) = match status {
         Status::KeepRunning { seconds } => (seconds, "RUN"),
