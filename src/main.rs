@@ -3,6 +3,7 @@
 mod util;
 mod dashboard;
 mod db;
+mod invocation;
 
 crate::entry_point!("hello", hello);
 fn hello() {

@@ -12,4 +12,6 @@ fn init_tables() {
         id SERIAL PRIMARY KEY
     );
     "#).unwrap();
+
+    crate::invocation::create_table(&mut client);
 }
