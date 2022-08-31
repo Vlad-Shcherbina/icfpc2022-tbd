@@ -2,6 +2,8 @@
 
 use std::path::{Path, PathBuf};
 
+pub type DateTime = chrono::DateTime<chrono::Utc>;
+
 pub fn project_root() -> PathBuf {
     let exe = std::fs::canonicalize(std::env::args().next().unwrap()).unwrap();
     let mut path: &Path = &exe;
