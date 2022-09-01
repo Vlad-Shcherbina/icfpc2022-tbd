@@ -124,5 +124,5 @@ mod filters {
     struct InvocationRefTemplate<'a> {
         id: i32,
         inv: &'a Invocation,
-    }    
+    }
 }

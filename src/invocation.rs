@@ -8,7 +8,7 @@ fn invocation_demo() {
 
     let mut tx = client.transaction().unwrap();
     let id = record_this_invocation(&mut tx, Status::KeepRunning { seconds: 35.0 });
-    tx.commit().unwrap();    
+    tx.commit().unwrap();
     eprintln!("running as invocation {}...", id);
 
     std::thread::sleep(std::time::Duration::from_secs(30));
@@ -71,7 +71,7 @@ pub fn record_this_invocation(t: &mut Transaction, status: Status) -> i32 {
                 update_time = NOW() + $2 * interval '1 second',
                 data = $3
             WHERE id = $4
-        ", &[&status, &delta_time, &Json(&*THIS_INVOCATION), &id]).unwrap();    
+        ", &[&status, &delta_time, &Json(&*THIS_INVOCATION), &id]).unwrap();
     }
     id
 }
