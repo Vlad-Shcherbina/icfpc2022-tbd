@@ -13,11 +13,14 @@ Every table probably should have the following column:
 invocation_id INTEGER NOT NULL REFERENCES invocations_raw(id)
 ```
 
-Invocations are recorded using `record_this_invocation()`. You pass it expected time till the next update. If invocation is not updated by this deadline, it's considered lost (abnormally terminated). It only affects how it is presented in the invocations table in the dashboard.
+Invocations are recorded using `record_this_invocation()`.
+You pass it expected time till the next update.
+If invocation is not updated by this deadline, it's considered lost (abnormally terminated).
+It only affects how it is presented in the invocations table in the dashboard.
 ```
 let invocation_id = record_this_invocation(KeepRunning { seconds: 35 });
 sleep(30);
 let invocation_id = record_this_invocation(KeepRunning { seconds: 35 });
 sleep(30);
-let invocation_id = record_this_invocation(Done);
+let invocation_id = record_this_invocation(Stopped);
 ```

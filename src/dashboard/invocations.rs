@@ -114,6 +114,11 @@ mod filters {
     #[derive(Template)]
     #[template(ext = "html", source = r#"
     <a href="/invocation/{{ id }}">inv/{{ id }}</a>
+    <span style="font-family: monospace">
+    {% for arg in inv.argv[1..] %}
+      {{ arg }}
+    {% endfor %}
+    </span>
     {{ inv.user }}@{{ inv.machine }}
     <a href="https://github.com/Vlad-Shcherbina/icfpc2022-tbd/commit/{{ inv.version.commit }}">{{ inv.version.commit[..8] }}</a>
     #{{ inv.version.commit_number }}
