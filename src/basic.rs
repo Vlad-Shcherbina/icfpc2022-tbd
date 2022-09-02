@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::fmt::Write;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Color {
     pub r: u8,
     pub g: u8,
@@ -85,17 +85,6 @@ impl std::fmt::Display for Move {
     }
 }
 
-impl Default for Color {
-    fn default() -> Self {
-        Color {
-            r: 0,
-            g: 0,
-            b: 0,
-            a: 0
-        }
-    }
-}
-
 #[cfg(test)]
 #[test]
 fn test_move_to_string() {
@@ -115,7 +104,7 @@ cut [0] [y] [160]
 ");
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Shape {
     pub x1: i32,
     pub y1: i32,
@@ -198,7 +187,7 @@ impl PainterState {
         let mut blocks = HashMap::new();
         let shape = Shape { x1: 0, y1: 0, x2: width, y2: height };
         blocks.insert(vec![0], Block {
-            shape: shape.clone(),
+            shape,
             pieces: vec![(shape, Color { r: 0, g: 0, b: 0, a: 0 })],
         });
         PainterState {
@@ -320,7 +309,7 @@ impl PainterState {
             }
             Move::Color { block_id, color } => {
                 let block = self.blocks.get_mut(block_id).unwrap();
-                block.pieces = vec![(block.shape.clone(), *color)];
+                block.pieces = vec![(block.shape, *color)];
                 base_cost = 5;
                 block_size = block.shape.size();
             }
@@ -380,7 +369,7 @@ impl PainterState {
                         x2: block2.shape.x2,
                         y2: block2.shape.y2,
                     }
-                } else if block1.shape.y2 == block2.shape.y1 && block1.shape.x1 == block2.shape.x1 && block1.shape.x2 == block2.shape.x2 {
+                } else if block2.shape.y2 == block1.shape.y1 && block1.shape.x1 == block2.shape.x1 && block1.shape.x2 == block2.shape.x2 {
                     // 1 on top of 2
                     Shape {
                         x1: block2.shape.x1,
