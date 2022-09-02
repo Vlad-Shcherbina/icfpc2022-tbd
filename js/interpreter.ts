@@ -200,7 +200,10 @@ run.addEventListener('click', () => {
                 const blk2 = blocks.get(cmd.block2);
                 if (!blk1) throw new Error(`No such block: ${cmd.block1}`);
                 if (!blk2) throw new Error(`No such block: ${cmd.block2}`);
-                this_step_cost = Math.max(cost_est(blk1.c), cost_est(blk2.c));
+                // block_size = max(size(blk1), size(blk2)), according to organizers
+                // since cost is inversely proportional to block size, all else being equal,
+                // we use minimal cost of the two.
+                this_step_cost = Math.min(cost_est(blk1.c), cost_est(blk2.c));
                 if (blk1.x === blk2.x) {
                     if (blk1.c.width !== blk2.c.width) throw new Error("Blocks are not compatible for merge: width differs");
                     const minY = Math.min(blk1.y, blk2.y);
