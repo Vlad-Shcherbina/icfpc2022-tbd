@@ -31,6 +31,7 @@ const run = document.getElementById("run")!;
 const back = document.getElementById("back")!;
 const forward = document.getElementById("forward")!;
 const costSpan = document.getElementById("cost") as HTMLSpanElement;
+const totalCostSpan = document.getElementById("total_cost") as HTMLSpanElement;
 const diffSpan = document.getElementById("difference") as HTMLSpanElement;
 const stepSpan = document.getElementById("step") as HTMLSpanElement;
 const referenceFile = document.getElementById("reference") as HTMLInputElement;
@@ -230,7 +231,9 @@ run.addEventListener('click', () => {
     }
     render(blocks);
     costSpan.innerText = `Cost: ${cost}`;
-    diffSpan.innerText = `Difference: ${computeDifference()}`;
+    const diff = computeDifference();
+    diffSpan.innerText = `Difference: ${diff}`;
+    totalCostSpan.innerText = `Total cost: ${cost + diff}`;
     updateHash();
 });
 
