@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![allow(clippy::needless_range_loop)]
 
 use std::collections::HashMap;
 
@@ -35,7 +36,7 @@ fn gradient_step(colors: &HashMap<Color, f64>, color: &mut [f64; 4]) {
     }
     let mut len = 0f64;
     for i in 0..4 { len += gradient[i] * gradient[i]; }
-    for i in 0..4 { color[i] += gradient[i] / len.sqrt(); 
+    for i in 0..4 { color[i] += gradient[i] / len.sqrt();
     }
 }
 
@@ -77,7 +78,7 @@ fn gradient() {
         total += v;
     }
 
-    for i in 0..4 { color_array[i] = color_array[i] / (target.height * target.width) as f64; }
+    for i in 0..4 { color_array[i] /= (target.height * target.width) as f64; }
     println!("{}", shape_distance(&colors, &f64_to_color(&color_array)));
     println!("{}", shape_distance(&colors, &optimal_color_for_block(&target,
         &Shape{x1: 0, x2: target.width, y1: 0, y2: target.height})));

@@ -21,12 +21,10 @@ impl State {
 
     fn potential_gain(&self, painter_state: &PainterState, shape: Shape) -> i32 {
         let img = painter_state.render();
-        let x = shape.x1;
-        let y = shape.y1;
         let w = shape.x2 - shape.x1;
         let h = shape.y2 - shape.y1;
         let res =
-            image_slice_distance(&self.img, &img, x, y, x, y, w, h) as i32;
+            image_slice_distance(&self.img, &img, shape) as i32;
         println!("COMPARE {} {} {} {} = {}", w, h, w, h, res);
         res
     }
