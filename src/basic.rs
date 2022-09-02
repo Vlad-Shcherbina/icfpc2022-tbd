@@ -449,7 +449,7 @@ impl PainterState {
                 new_block.pieces.extend(block2.pieces);
 
                 base_cost = 1;
-                block_size = new_block.shape.size();
+                block_size = block1.shape.size().max(block2.shape.size());
 
                 self.blocks.insert(BlockId::root(self.next_id), new_block);
                 self.next_id += 1;
