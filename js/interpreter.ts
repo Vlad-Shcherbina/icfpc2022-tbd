@@ -71,11 +71,14 @@ function save_step(blocks: Map<string, Block>, this_step_cost: number, cmd: Comm
     exec_steps.push(step);
 }
 
+const mainCanvas = document.getElementById("canvas") as HTMLCanvasElement;
+const mainCtx = mainCanvas.getContext("2d")!;
+mainCtx.translate(0, mainCanvas.height);
+mainCtx.scale(1, -1);
+
 function render(blocks: Map<string, Block>) {
-    const canvas = document.getElementById("canvas") as HTMLCanvasElement;
-    const ctx = canvas.getContext("2d")!;
     for(const v of blocks.values()) {
-        ctx.drawImage(v.c, v.x, v.y);
+        mainCtx.drawImage(v.c, v.x, v.y);
     }
 }
 
@@ -194,6 +197,7 @@ run.addEventListener('click', () => {
                 const blk2 = blocks.get(cmd.block2);
                 if (!blk1) throw new Error(`No such block: ${cmd.block1}`);
                 if (!blk2) throw new Error(`No such block: ${cmd.block2}`);
+                this_step_cost = Math.max(cost_est(blk1.c), cost_est(blk2.c));
                 if (blk1.x === blk2.x) {
                     if (blk1.c.width !== blk2.c.width) throw new Error("Blocks are not compatible for merge: width differs");
                     const minY = Math.min(blk1.y, blk2.y);
@@ -201,8 +205,7 @@ run.addEventListener('click', () => {
                     blk1.y -= minY;
                     blk2.y -= minY;
                     blk1.x = blk2.x = 0;
-                    const nb = mergeBlocks(oldX, minY, blk1.c.width, blk1.c.height + blk2.c.height, blk1, blk2);
-                    this_step_cost = cost_est(nb.c);
+                    mergeBlocks(oldX, minY, blk1.c.width, blk1.c.height + blk2.c.height, blk1, blk2);
                 } else if (blk1.y === blk2.y) {
                     if (blk1.c.height !== blk2.c.height) throw new Error("Blocks are not compatible for merge: height differs");
                     const minX = Math.min(blk1.x, blk2.x);
@@ -210,8 +213,7 @@ run.addEventListener('click', () => {
                     blk1.x -= minX;
                     blk2.x -= minX;
                     blk1.y = blk2.y = 0;
-                    const nb = mergeBlocks(minX, oldY, blk1.c.width + blk2.c.width, blk1.c.height, blk1, blk2);
-                    this_step_cost = cost_est(nb.c);
+                    mergeBlocks(minX, oldY, blk1.c.width + blk2.c.width, blk1.c.height, blk1, blk2);
                 } else {
                     throw new Error("Blocks to be merged are not aligned");
                 }
@@ -275,8 +277,6 @@ referenceFile.addEventListener('input', async (evt: Event) => {
     canvas.width = bitmap.width;
     canvas.height = bitmap.height;
     const ctx = canvas.getContext("2d")!;
-    ctx.translate(0, bitmap.height);
-    ctx.scale(1, -1);
     ctx.drawImage(bitmap, 0, 0);
 })
 
@@ -339,8 +339,6 @@ function loadReferenceImage() {
         canvas.width = img.width;
         canvas.height = img.height;
         const ctx = canvas.getContext("2d")!;
-        ctx.translate(0, img.height);
-        ctx.scale(1, -1);
         ctx.drawImage(img, 0, 0);
         updateHash();
     }
@@ -358,7 +356,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if(window.location.hash) {
         const state = JSON.parse(atob(window.location.hash.slice(1)));
-        const ref_canvas = document.getElementById("ref_canvas") as HTMLCanvasElement;
         inputBox.value = state.input;
         referenceSelector.value = state.reference;
     }
