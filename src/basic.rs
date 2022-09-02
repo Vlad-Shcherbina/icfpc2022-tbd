@@ -403,7 +403,7 @@ impl PainterState {
         }
     }
 
-    // Returns
+    // Returns the cost of the applied move
     pub fn apply_move(&mut self, m: &Move) -> i32 {
         let base_cost;
         let block_size;
@@ -604,7 +604,7 @@ fn test_split_merge() {
         orientation: Orientation::Horizontal,
         line_number: 50,
     });
-    painter.apply_move(&Merge { block_id1: BlockId::root(0).child(0), block_id2: BlockId::root(0).child(1) })
+    painter.apply_move(&Merge { block_id1: BlockId::root(0).child(0), block_id2: BlockId::root(0).child(1) });
 }
 
 
