@@ -2,6 +2,7 @@ mod dev_server;
 mod static_files;
 mod examples;
 mod invocations;
+mod solutions;
 
 use crate::util::project_root;
 use dev_server::Request;
@@ -22,6 +23,10 @@ fn dashboard() {
 
         if let Some(path) = req.path.strip_prefix("/invocation/") {
             return invocations::handler(&state, Request { path, ..req }, resp);
+        }
+
+        if let Some(path) = req.path.strip_prefix("/solution/") {
+            return solutions::handler(&state, Request { path, ..req }, resp);
         }
 
         if req.path == "/" {
