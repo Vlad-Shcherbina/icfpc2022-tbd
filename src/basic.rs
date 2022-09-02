@@ -1,7 +1,7 @@
 #![allow(unused_imports)]
 
 use std::collections::HashMap;
-use std::fmt::Write;
+use std::fmt::{Formatter, Write};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Color {
@@ -112,6 +112,18 @@ pub struct Shape {
     pub y1: i32,
     pub x2: i32,
     pub y2: i32,
+}
+
+impl std::fmt::Display for Shape {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "shape([{}, {}]x[{}, {}])", self.x1, self.x2, self.y1, self.y2)
+    }
+}
+
+impl std::fmt::Display for Color {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}, {}, {}, {}]", self.r, self.g, self.b, self.a)
+    }
 }
 
 impl Shape {

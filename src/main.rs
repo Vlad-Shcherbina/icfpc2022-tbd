@@ -5,6 +5,7 @@ mod dashboard;
 mod db;
 mod invocation;
 pub mod basic;
+mod qtree;
 
 crate::entry_point!("hello", hello);
 fn hello() {
