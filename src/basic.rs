@@ -1,4 +1,5 @@
 #![allow(unused_imports)]
+#![allow(dead_code)]
 
 use std::collections::HashMap;
 use std::fmt::{Formatter, Write};
@@ -83,6 +84,101 @@ impl std::fmt::Display for Move {
             } => write!(f, "merge [{}] [{}]", block_id_to_string(block_id1), block_id_to_string(block_id2)),
         }
     }
+}
+
+impl Move {
+    fn parse(s: &str) -> Move {
+        let s = s.replace(' ', "");
+        if let Some(s) = s.strip_prefix("color") {
+            let (block_id, s) = strip_block_id(s);
+            let s = s.strip_prefix('[').unwrap();
+            let s = s.strip_suffix(']').unwrap();
+            let mut it = s.split(',');
+            let color = Color {
+                r: it.next().unwrap().parse().unwrap(),
+                g: it.next().unwrap().parse().unwrap(),
+                b: it.next().unwrap().parse().unwrap(),
+                a: it.next().unwrap().parse().unwrap(),
+            };
+            assert!(it.next().is_none());
+            return Move::Color {
+                block_id,
+                color,
+            };
+        }
+        if let Some(s) = s.strip_prefix("cut") {
+            let (block_id, s) = strip_block_id(s);
+            if let Some(s) = s.strip_prefix("[x]") {
+                let line_number = s.strip_prefix('[').unwrap().strip_suffix(']').unwrap().parse().unwrap();
+                return Move::LCut {
+                    block_id,
+                    orientation: Vertical,
+                    line_number,
+                };
+            } else if let Some(s) = s.strip_prefix("[y]") {
+                let line_number = s.strip_prefix('[').unwrap().strip_suffix(']').unwrap().parse().unwrap();
+                return Move::LCut {
+                    block_id,
+                    orientation: Horizontal,
+                    line_number,
+                };
+            } else {
+                let s = s.strip_prefix('[').unwrap();
+                let s = s.strip_suffix(']').unwrap();
+                let mut it = s.split(',');
+                let x = it.next().unwrap().parse().unwrap();
+                let y = it.next().unwrap().parse().unwrap();
+                assert!(it.next().is_none());
+                return Move::PCut {
+                    block_id,
+                    x,
+                    y,
+                };
+            }
+        }
+        if let Some(s) = s.strip_prefix("swap") {
+            let (block_id1, s) = strip_block_id(s);
+            let (block_id2, s) = strip_block_id(s);
+            assert_eq!(s, "");
+            return Move::Swap {
+                block_id1,
+                block_id2,
+            };
+        }
+        if let Some(s) = s.strip_prefix("merge") {
+            let (block_id1, s) = strip_block_id(s);
+            let (block_id2, s) = strip_block_id(s);
+            assert_eq!(s, "");
+            return Move::Merge {
+                block_id1,
+                block_id2,
+            };
+        }
+        panic!("unrecognized move {:?}", s);
+    }
+}
+
+fn strip_block_id(s: &str) -> (Vec<usize>, &str) {
+    let s = s.strip_prefix('[').unwrap();
+    let (block_id, s) = s.split_once(']').unwrap();
+    let block_id = block_id.split('.').map(|p| p.parse().unwrap()).collect();
+    (block_id, s)
+}
+
+fn roundtrip(s: &str) {
+    let m = Move::parse(s);
+    let s2 = format!("{}", m);
+    assert_eq!(s, s2);
+}
+
+#[test]
+fn test_string_to_move_and_back() {
+    roundtrip("color [0.1] [146, 149, 120, 223]");
+    roundtrip("cut [0.1] [x] [11]");
+    roundtrip("cut [0.1] [y] [42]");
+    roundtrip("cut [0.1] [42, 11]");
+    roundtrip("swap [0.1] [7.2]");
+    roundtrip("merge [0.1] [7.2]");
 }
 
 #[cfg(test)]
