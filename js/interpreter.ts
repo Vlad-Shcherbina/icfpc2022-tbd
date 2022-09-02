@@ -339,17 +339,16 @@ function updateHash() {
     window.location.hash = btoa(JSON.stringify(state));
 }
 
-function loadReferenceImage() {
+async function loadReferenceImage() {
     const img = new Image();
     img.src = `${window.location.protocol}//${window.location.host}/data/problems/${referenceSelector.value}`;
-    img.onload = () => {
-        const canvas = document.getElementById("ref_canvas") as HTMLCanvasElement;
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext("2d")!;
-        ctx.drawImage(img, 0, 0);
-        updateHash();
-    }
+    await new Promise((resolve) => img.onload=resolve)
+    const canvas = document.getElementById("ref_canvas") as HTMLCanvasElement;
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(img, 0, 0);
+    updateHash();
 }
 
 function updateOverlayStyle() {
@@ -365,7 +364,7 @@ function updateOverlayStyle() {
     updateHash();
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     referenceSelector.addEventListener('change', () => {
         loadReferenceImage();
     })
@@ -384,5 +383,8 @@ document.addEventListener('DOMContentLoaded', () => {
         heatmapColor.value = state.heatmapColor || "#ff0000";
         updateOverlayStyle();
     }
-    loadReferenceImage();
+    await loadReferenceImage();
+    if(window.location.hash) {
+        run.click();
+    }
 });
