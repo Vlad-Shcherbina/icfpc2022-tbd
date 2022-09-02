@@ -15,6 +15,7 @@ postgres = { version = "*", features = ["with-serde_json-1"] }
 once_cell = "*"
 whoami = "*"
 chrono = { version = "*", default-features = false, features = ["std"] }
+image = { version = "*", default-features = false, features = ["png"] }
 
 [profile.dev.package."*"]
 opt-level = "s"

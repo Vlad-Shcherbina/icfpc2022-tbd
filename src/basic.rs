@@ -156,6 +156,8 @@ impl Block {
 }
 
 pub struct PainterState {
+    width: i32,
+    height: i32,
     next_id: usize,
     blocks: HashMap<Vec<usize>, Block>,
 }
@@ -169,6 +171,8 @@ impl PainterState {
             pieces: vec![(shape, Color { r: 0, g: 0, b: 0, a: 0 })],
         });
         PainterState {
+            width,
+            height,
             next_id: 1,
             blocks,
         }
@@ -337,4 +341,48 @@ impl PainterState {
             }
         }
     }
+
+    pub fn render(&self) -> image::RgbaImage {
+        let mut res = image::RgbaImage::new(self.width as u32, self.height as u32);
+        for block in self.blocks.values() {
+            for (shape, color) in &block.pieces {
+                let c = image::Rgba([color.r, color.g, color.b, color.a]);
+                for x in shape.x1..shape.x2 {
+                    for y in shape.y1..shape.y2 {
+                        res.put_pixel(x as u32, (self.height - 1 - y) as u32, c);
+                    }
+                }
+            }
+        }
+        res
+    }
+}
+
+crate::entry_point!("render_moves_example", render_moves_example);
+fn render_moves_example() {
+    let moves = vec![
+        PCut {
+            block_id: vec![0],
+            x: 200,
+            y: 200
+        },
+        Move::Color {
+            block_id: vec![0, 0],
+            color: Color { r: 255, g: 0, b: 0, a: 255 },
+        },
+        Move::Color {
+            block_id: vec![0, 2],
+            color: Color { r: 0, g: 255, b: 0, a: 255 },
+        },
+    ];
+    let mut painter = PainterState::new(400, 400);
+    for m in &moves {
+        eprintln!("{}", m);
+        painter.apply_move(m);
+    }
+    let img = painter.render();
+    let path = "outputs/render_moves_example.png";
+    img.save(crate::util::project_path(path)).unwrap();
+    eprintln!();
+    eprintln!("saved to {}", path);
 }
