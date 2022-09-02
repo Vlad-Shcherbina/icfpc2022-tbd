@@ -27,16 +27,19 @@ fn gradient_step(colors: &HashMap<Color, f64>, color: &mut [f64; 4]) {
         let mut step = [0f64; 4];
         let mut len = 0f64;
         for i in 0..4 {
-            step[i] = color[i] as f64 - k.0[i] as f64;
+            step[i] = k.0[i] as f64 - color[i] as f64;
             len += step[i] * step[i];
         }
-        for i in 0..4 {
-            gradient[i] += step[i] / len.sqrt() * v;
+        if len > 1.0 {
+            for i in 0..4 {
+                gradient[i] += step[i] / len.sqrt() * v;
+            }
         }
     }
     let mut len = 0f64;
     for i in 0..4 { len += gradient[i] * gradient[i]; }
-    for i in 0..4 { color[i] += gradient[i] / len.sqrt();
+    if len > 1.0 {
+        for i in 0..4 { color[i] += gradient[i] / len.sqrt(); }
     }
 }
 
