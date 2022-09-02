@@ -13,8 +13,8 @@ fn init_tables() {
         problem_id INTEGER NOT NULL,  -- could be foreign key, but maybe we don't want to bother with the "problems" table
 
         data TEXT NOT NULL,  -- move instructions as text
-        moves_cost INTEGER NOT NULL,
-        image_distance INTEGER NOT NULL,
+        moves_cost BIGINT NOT NULL,
+        image_distance BIGINT NOT NULL,
 
         solver TEXT NOT NULL,  -- name of the solver
         solver_args JSONB NOT NULL,  -- any solver-specific parameters, just to understand what's going on
