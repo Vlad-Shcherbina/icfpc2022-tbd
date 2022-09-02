@@ -327,7 +327,7 @@ impl Shape {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq, Eq)]
 struct Block {
     shape: Shape,
     pieces: Vec<(Shape, Color)>,
@@ -377,12 +377,13 @@ fn test_sub_block() {
 }
 
 
+#[derive(Clone)]
 pub struct PainterState {
     width: i32,
     height: i32,
     next_id: usize,
     blocks: HashMap<BlockId, Block>,
-    pub cost: i32,
+    pub(crate) cost: i32,
 }
 
 impl PainterState {
@@ -402,7 +403,8 @@ impl PainterState {
         }
     }
 
-    pub fn apply_move(&mut self, m: &Move) {
+    // Returns
+    pub fn apply_move(&mut self, m: &Move) -> i32 {
         let base_cost;
         let block_size;
         match m {
@@ -457,7 +459,9 @@ impl PainterState {
                 self.next_id += 1;
             }
         }
-        self.cost += (base_cost * self.width * self.height + (block_size + 1)/2) / block_size;
+        let extra_cost = (base_cost * self.width * self.height + (block_size + 1)/2) / block_size;
+        self.cost += extra_cost;
+        extra_cost
     }
 
     pub fn render(&self) -> image::RgbaImage {
