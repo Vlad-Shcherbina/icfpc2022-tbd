@@ -147,8 +147,8 @@ fn next_request<'a>(
     let method = parts.next().unwrap();
     let path = parts.next().unwrap();
     eprintln!("{} {} {}", stream.peer_addr().unwrap(), method, path);
-    let http_version = parts.next().unwrap();
-    assert_eq!(http_version, "HTTP/1.1");
+    // let http_version = parts.next().unwrap();
+    // assert_eq!(http_version, "HTTP/1.1"); // Support Firefox!
     Ok(Some(RawRequest {
         method,
         path,
