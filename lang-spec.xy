@@ -1,0 +1,54 @@
+lb /\[/
+rb /\]/
+cut /cut/
+color /color/
+swap /swap/
+merge /merge/
+orientation /[XxYy]/ { text.toLowerCase() }
+number /[0-9]+/ { parseInt(text, 10) }
+comma /,/
+newline /\n/
+dot /\./
+comment /#[^\n]*/ { text.slice(1) }
+/ +/
+
+%%
+
+Program
+  : ProgramLine %eof { [_1] }
+  | ProgramLine newline Program { [_1].concat(_3) }
+  ;
+
+ProgramLine
+  : { null }
+  | comment { ({type: "comment", text: _1}) }
+  | Move { _1 }
+  ;
+
+Move
+  : cut Block Point
+      { ({type: "cut-point", block: _2, point: _3}) }
+  | cut Block lb orientation rb lb number rb
+      { ({type: "cut-line", block: _2, dir: _4, num: _7}) }
+  | color Block Color
+      { ({type: "color", block: _2, color: _3}) }
+  | swap Block Block
+      { ({type: "swap", block1: _2, block2: _3}) }
+  | merge Block Block
+      { ({type: "merge", block1: _2, block2: _3}) }
+  ;
+
+Block : lb BlockId rb { _2 }
+  ;
+
+BlockId
+  : number { `${_1}` }
+  | number dot BlockId { `${_1}.${_3}` }
+  ;
+
+Point : lb number comma number rb { [_2, _4] }
+  ;
+
+Color : lb number comma number comma number comma number rb
+  { [_2,_4,_6,_8] }
+  ;

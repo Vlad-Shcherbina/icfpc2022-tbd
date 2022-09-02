@@ -14,6 +14,10 @@ pub fn handler(req: Request, resp: ResponseBuilder) -> HandlerResult {
         let s = AjaxTemplate {}.render().unwrap();
         return resp.code("200 OK").body(s);
     }
+    if req.path == "interpreter" {
+        let s = InterpreterTemplate {}.render().unwrap();
+        return resp.code("200 OK").body(s);
+    }
     if req.path == "foobar" {
         assert_eq!(req.method, "POST");
         let request: FoobarRequest = serde_json::from_str(std::str::from_utf8(req.body).unwrap()).unwrap();
@@ -47,6 +51,11 @@ struct HelloTemplate<'a> {
 #[derive(Template)]
 #[template(path = "ajax.html")]
 struct AjaxTemplate {
+}
+
+#[derive(Template)]
+#[template(path = "interpreter.html")]
+struct InterpreterTemplate {
 }
 
 // keep in sync with types.ts
