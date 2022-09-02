@@ -93,7 +93,6 @@ pub fn record_this_invocation(t: &mut Transaction, status: Status) -> i32 {
 }
 
 pub fn get_invocations(client: &mut Client) -> Vec<Snapshot> {
-    let _do = create_table(client); // update VIEW with the latest LOST entries
     let v = client.query("SELECT id, status, start_time, update_time, data FROM invocations", &[]).unwrap();
     return v.iter().map(|row| {
         let sql_id: i32 = row.get(0);
@@ -107,7 +106,7 @@ pub fn get_invocations(client: &mut Client) -> Vec<Snapshot> {
             "STOPPED" => RecordedStatus::Stopped { start: t_0, finish: t_u },
             _ => RecordedStatus::Lost { start: t_0, lost: t_u }
         };
-        return Snapshot{
+        Snapshot{
             sql_id,
             status,
             invocation: invocation.0,
@@ -193,17 +192,17 @@ impl Version {
             .output().unwrap();
 
         let diff_stat = std::process::Command::new("git")
-            .args(&["diff", "HEAD", "--stat"])
+            .args(["diff", "HEAD", "--stat"])
             .output().unwrap().stdout;
         let diff_stat = std::str::from_utf8(&diff_stat).unwrap().trim_end().to_owned();
 
         let commit = std::process::Command::new("git")
-            .args(&["rev-parse", "HEAD"])
+            .args(["rev-parse", "HEAD"])
             .output().unwrap().stdout;
         let commit = std::str::from_utf8(&commit).unwrap().trim_end().to_owned();
 
         let commit_number = std::process::Command::new("git")
-            .args(&["rev-list", "--count", "HEAD"])
+            .args(["rev-list", "--count", "HEAD"])
             .output().unwrap().stdout;
         let commit_number = std::str::from_utf8(&commit_number).unwrap().trim_end();
         let commit_number = commit_number.parse().unwrap();
