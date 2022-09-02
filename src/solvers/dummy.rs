@@ -11,6 +11,8 @@
 use crate::util::project_path;
 use crate::basic::*;
 use crate::image::Image;
+use crate::invocation::{record_this_invocation, Status};
+use crate::uploader::upload_solution;
 
 crate::entry_point!("dummy_solver", dummy_solver);
 fn dummy_solver() {
@@ -49,4 +51,10 @@ fn dummy_solver() {
     let output_path = format!("outputs/dummy_{}.png", problem_id);
     img.save(&crate::util::project_path(&output_path));
     eprintln!("saved to {}", output_path);
+
+    let mut client = crate::db::create_client();
+    let mut tx = client.transaction().unwrap();
+    let incovation_id = record_this_invocation(&mut tx, Status::Stopped);
+    upload_solution(&mut tx, problem_id, &moves, "dummy", &serde_json::Value::Null, incovation_id);
+    tx.commit().unwrap();
 }
