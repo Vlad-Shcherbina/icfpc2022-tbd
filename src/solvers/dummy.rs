@@ -25,8 +25,8 @@ fn dummy_solver() {
 
     let target = Image::load(&project_path(format!("data/problems/{}.png", problem_id)));
 
-    // Just take some color from the target image.
-    let color = target.get_pixel(0, 0);
+    let color = crate::solver_utils::optimal_color_for_block(
+        &target, &Shape { x1: 0, y1: 0, x2: target.width, y2: target.height });
 
     let moves = vec![
         Move::Color {
