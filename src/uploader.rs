@@ -2,6 +2,7 @@ use std::fmt::Write;
 use crate::basic::*;
 use crate::image::Image;
 use crate::util::project_path;
+use crate::invocation::{record_this_invocation, Status};
 
 pub fn upload_solution(
     tx: &mut postgres::Transaction,
@@ -36,4 +37,30 @@ pub fn upload_solution(
         problem_id, moves_cost, dist, moves_cost as i64 + dist, id);
 
     id
+}
+
+crate::entry_point!("upload_solution", upload_solution_ep);
+fn upload_solution_ep() {
+    let mut pargs = pico_args::Arguments::from_vec(std::env::args_os().skip(2).collect());
+    let problem_id: i32 = pargs.value_from_str("--problem").unwrap();
+    let solution_path: String = pargs.value_from_str("--solution").unwrap();
+    let solver_name: String = pargs.value_from_str("--solver").unwrap();
+    let rest = pargs.finish();
+    assert!(rest.is_empty(), "unrecognized arguments {:?}", rest);
+
+    let solution_text = std::fs::read_to_string(solution_path).unwrap();
+    let mut moves = vec![];
+    for line in solution_text.split_terminator('\n') {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        moves.push(Move::parse(line));
+    }
+
+    let mut client = crate::db::create_client();
+    let mut tx = client.transaction().unwrap();
+    let incovation_id = record_this_invocation(&mut tx, Status::Stopped);
+    upload_solution(&mut tx, problem_id, &moves, &solver_name, &serde_json::Value::Null, incovation_id);
+    tx.commit().unwrap();
 }

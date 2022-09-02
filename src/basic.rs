@@ -115,7 +115,7 @@ impl std::fmt::Display for Move {
 }
 
 impl Move {
-    fn parse(s: &str) -> Move {
+    pub fn parse(s: &str) -> Move {
         let s = s.replace(' ', "");
         if let Some(s) = s.strip_prefix("color") {
             let (block_id, s) = strip_block_id(s);

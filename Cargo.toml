@@ -16,6 +16,7 @@ once_cell = "*"
 whoami = "*"
 chrono = { version = "*", default-features = false, features = ["std"] }
 image = { version = "*", default-features = false, features = ["png"] }
+pico-args = { version = "*", features = ["eq-separator"] }
 
 [profile.dev.package."*"]
 opt-level = "s"
