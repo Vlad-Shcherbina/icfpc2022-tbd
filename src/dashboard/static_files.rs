@@ -29,6 +29,7 @@ pub fn static_handler(root_path: &std::path::Path, req: Request, resp: ResponseB
         "js" => "application/javascript",
         "map" => "text/plain",
         "ts" => "text/plain",
+        "png" => "image/png",
         _ => todo!("{}", path.to_string_lossy()),
     };
 

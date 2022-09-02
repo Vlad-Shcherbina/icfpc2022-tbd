@@ -34,6 +34,7 @@ const costSpan = document.getElementById("cost") as HTMLSpanElement;
 const diffSpan = document.getElementById("difference") as HTMLSpanElement;
 const stepSpan = document.getElementById("step") as HTMLSpanElement;
 const referenceFile = document.getElementById("reference") as HTMLInputElement;
+const referenceSelector = document.getElementById("reference_select") as HTMLInputElement;
 const parser = new Parser();
 
 function copyFrom(c: HTMLCanvasElement, sx: number, sy: number, sw: number, sh: number) {
@@ -277,7 +278,6 @@ referenceFile.addEventListener('input', async (evt: Event) => {
     ctx.translate(0, bitmap.height);
     ctx.scale(1, -1);
     ctx.drawImage(bitmap, 0, 0);
-    updateHash();
 })
 
 type RGBA = {r: number, g: number, b: number, a: number};
@@ -324,21 +324,43 @@ function computeDifference() {
 }
 
 function updateHash() {
-    const ref_canvas = document.getElementById("ref_canvas") as HTMLCanvasElement;
     const state = {
         input: inputBox.value,
-        reference: ref_canvas.toDataURL(),
+        reference: referenceSelector.value,
     }
     window.location.hash = btoa(JSON.stringify(state));
 }
 
+function loadReferenceImage() {
+    const img = new Image();
+    img.src = `${window.location.protocol}//${window.location.host}/data/problems/${referenceSelector.value}`;
+    img.onload = () => {
+        const canvas = document.getElementById("ref_canvas") as HTMLCanvasElement;
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d")!;
+        ctx.translate(0, img.height);
+        ctx.scale(1, -1);
+        ctx.drawImage(img, 0, 0);
+        updateHash();
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    referenceSelector.addEventListener('change', () => {
+        loadReferenceImage();
+    })
+    for(let i = 1; i<= 15; i++) {
+        const option = document.createElement('option');
+        option.value = `${i}.png`;
+        option.innerText = option.value;
+        referenceSelector.appendChild(option);
+    }
     if(window.location.hash) {
         const state = JSON.parse(atob(window.location.hash.slice(1)));
         const ref_canvas = document.getElementById("ref_canvas") as HTMLCanvasElement;
-        const img = new Image;
-        img.onload = () => { ref_canvas.getContext('2d')!.drawImage(img, 0, 0); };
-        img.src = state.reference;
         inputBox.value = state.input;
+        referenceSelector.value = state.reference;
     }
+    loadReferenceImage();
 });
