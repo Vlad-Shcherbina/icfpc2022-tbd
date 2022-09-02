@@ -360,7 +360,7 @@ pub struct PainterState {
     height: i32,
     next_id: usize,
     blocks: HashMap<Vec<usize>, Block>,
-    cost: i32,
+    pub cost: i32,
 }
 
 impl PainterState {

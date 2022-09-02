@@ -7,6 +7,7 @@ mod invocation;
 mod print_invocations;
 pub mod basic;
 mod qtree;
+mod solvers;
 
 crate::entry_point!("hello", hello);
 fn hello() {
