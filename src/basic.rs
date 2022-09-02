@@ -155,6 +155,46 @@ impl Shape {
             },
         ]
     }
+
+    fn l_cut_subshapes(&self, orientation: Orientation, line_number: i32) -> [Shape; 2] {
+        match orientation {
+            Horizontal => {
+                assert!(self.y1 < line_number && line_number < self.y2);
+                [
+                    Shape {
+                        x1: self.x1,
+                        y1: self.y1,
+                        x2: self.x2,
+                        y2: line_number,
+                    },
+                    Shape {
+                        x1: self.x1,
+                        y1: line_number,
+                        x2: self.x2,
+                        y2: self.y2,
+                    },
+                ]
+            }
+            Vertical => {
+                assert!(self.x1 < line_number && line_number < self.x2);
+                [
+                    Shape {
+                        x1: self.x1,
+                        y1: self.y1,
+                        x2: line_number,
+                        y2: self.y2,
+                    },
+                    Shape {
+                        x1: line_number,
+                        y1: self.y1,
+                        x2: self.x2,
+                        y2: self.y2,
+                    },
+                ]
+            }
+        }
+
+    }
 }
 
 #[derive(PartialEq)]
@@ -248,55 +288,12 @@ impl PainterState {
                 block_size = block.shape.size();
             }
             LCut { block_id, orientation, line_number } => {
-                let line_number = *line_number;
                 let block = self.blocks.remove(block_id).unwrap();
-                match orientation {
-                    Horizontal => {
-                        assert!(block.shape.y1 < line_number && line_number < block.shape.y2);
-
-                        let new_block = block.sub_block(Shape {
-                            x1: block.shape.x1,
-                            y1: block.shape.y1,
-                            x2: block.shape.x2,
-                            y2: line_number,
-                        });
-                        let mut new_block_id = block_id.clone();
-                        new_block_id.push(0);
-                        self.blocks.insert(new_block_id, new_block);
-
-                        let new_block = block.sub_block(Shape {
-                            x1: block.shape.x1,
-                            y1: line_number,
-                            x2: block.shape.x2,
-                            y2: block.shape.y2,
-                        });
-                        let mut new_block_id = block_id.clone();
-                        new_block_id.push(1);
-                        self.blocks.insert(new_block_id, new_block);
-                    }
-                    Vertical => {
-                        assert!(block.shape.x1 < line_number && line_number < block.shape.x2);
-
-                        let new_block = block.sub_block(Shape {
-                            x1: block.shape.x1,
-                            y1: block.shape.y1,
-                            x2: line_number,
-                            y2: block.shape.y2,
-                        });
-                        let mut new_block_id = block_id.clone();
-                        new_block_id.push(0);
-                        self.blocks.insert(new_block_id, new_block);
-
-                        let new_block = block.sub_block(Shape {
-                            x1: line_number,
-                            y1: block.shape.y1,
-                            x2: block.shape.x2,
-                            y2: block.shape.y2,
-                        });
-                        let mut new_block_id = block_id.clone();
-                        new_block_id.push(1);
-                        self.blocks.insert(new_block_id, new_block);
-                    }
+                for (i, ss) in block.shape.l_cut_subshapes(*orientation, *line_number).into_iter().enumerate() {
+                    let new_block = block.sub_block(ss);
+                    let mut new_block_id = block_id.clone();
+                    new_block_id.push(i);
+                    self.blocks.insert(new_block_id, new_block);
                 }
                 base_cost = 7;
                 block_size = block.shape.size();
