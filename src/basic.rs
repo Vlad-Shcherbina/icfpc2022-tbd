@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::fmt::Write;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Color {
     pub r: u8,
     pub g: u8,
@@ -85,6 +85,17 @@ impl std::fmt::Display for Move {
     }
 }
 
+impl Default for Color {
+    fn default() -> Self {
+        Color {
+            r: 0,
+            g: 0,
+            b: 0,
+            a: 0
+        }
+    }
+}
+
 #[cfg(test)]
 #[test]
 fn test_move_to_string() {
@@ -104,7 +115,7 @@ cut [0] [y] [160]
 ");
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Shape {
     pub x1: i32,
     pub y1: i32,
@@ -124,6 +135,7 @@ impl Shape {
     }
 }
 
+#[derive(PartialEq)]
 struct Block {
     shape: Shape,
     pieces: Vec<(Shape, Color)>,
@@ -157,6 +169,21 @@ impl Block {
         }
     }
 }
+
+#[cfg(test)]
+#[test]
+fn test_sub_block() {
+    let shape = Shape {x1: 10, y1: 110, x2: 20, y2: 120};
+    let shape2 = Shape {x1: 11, y1: 111, x2: 13, y2: 113};
+    let c = Color {r: 1, g: 2, b: 3, a: 4};
+    let block = Block {
+        shape: shape,
+        pieces: vec![(shape.clone(), c)]
+    };
+    let subblock = block.sub_block(shape2.clone());
+    assert!(subblock == Block {shape: shape2.clone(), pieces: vec![(shape2.clone(), c.clone())]})
+}
+
 
 pub struct PainterState {
     width: i32,
@@ -329,14 +356,37 @@ impl PainterState {
             Merge { block_id1, block_id2 } => {
                 let block1 = self.blocks.remove(block_id1).unwrap();
                 let block2 = self.blocks.remove(block_id2).unwrap();
-                let new_shape = if block1.shape.x2 == block2.shape.x1 {
-                    assert_eq!(block1.shape.y1, block2.shape.y1);
-                    assert_eq!(block1.shape.y2, block2.shape.y2);
+                let new_shape = if block1.shape.x2 == block2.shape.x1 && block1.shape.y1 == block2.shape.y1 && block1.shape.y2 == block2.shape.y2 {
+                    // 1 to the left of 2
                     Shape {
                         x1: block1.shape.x1,
                         y1: block1.shape.y1,
                         x2: block2.shape.x2,
                         y2: block2.shape.y2,
+                    }
+                } else if block2.shape.x1 == block1.shape.x2 && block1.shape.y1 == block2.shape.y1 && block1.shape.y2 == block2.shape.y2 {
+                    // 2 to the left of 1
+                    Shape {
+                        x1: block2.shape.x1,
+                        y1: block2.shape.y1,
+                        x2: block1.shape.x2,
+                        y2: block1.shape.y2,
+                    }
+                } else if block1.shape.y2 == block2.shape.y1 && block1.shape.x1 == block2.shape.x1 && block1.shape.x2 == block2.shape.x2 {
+                    // 2 on top of 1
+                    Shape {
+                        x1: block1.shape.x1,
+                        y1: block1.shape.y1,
+                        x2: block2.shape.x2,
+                        y2: block2.shape.y2,
+                    }
+                } else if block1.shape.y2 == block2.shape.y1 && block1.shape.x1 == block2.shape.x1 && block1.shape.x2 == block2.shape.x2 {
+                    // 1 on top of 2
+                    Shape {
+                        x1: block2.shape.x1,
+                        y1: block2.shape.y1,
+                        x2: block1.shape.x2,
+                        y2: block1.shape.y2,
                     }
                 } else {
                     panic!("merging blocks that are not adjacent {:?} {:?}", block1.shape, block2.shape);
@@ -404,3 +454,17 @@ fn render_moves_example() {
     eprintln!();
     eprintln!("saved to {}", path);
 }
+
+#[cfg(test)]
+#[test]
+fn test_split_merge() {
+    let mut painter = PainterState::new(100, 100);
+    painter.apply_move(&LCut {
+        block_id: vec![0],
+        orientation: Orientation::Horizontal,
+        line_number: 50,
+    });
+    painter.apply_move(&Merge { block_id1: vec![0, 0], block_id2: vec![0, 1] })
+}
+
+
