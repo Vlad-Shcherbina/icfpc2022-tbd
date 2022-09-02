@@ -4,6 +4,7 @@ mod util;
 mod dashboard;
 mod db;
 mod invocation;
+pub mod basic;
 
 crate::entry_point!("hello", hello);
 fn hello() {
