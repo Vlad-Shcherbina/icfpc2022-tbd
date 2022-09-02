@@ -98,7 +98,7 @@ impl State {
 
 fn qtree() {
     let problem_id = 2;
-    let path = project_path(format!("data/{}.png", problem_id));
+    let path = project_path(format!("data/problems/{}.png", problem_id));
     let img = read_img(path);
     let mut painter_state = PainterState::new(img.width() as i32, img.height() as i32);
     let mut state = State::new(img);
