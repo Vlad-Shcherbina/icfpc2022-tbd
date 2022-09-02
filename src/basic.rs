@@ -47,7 +47,7 @@ pub enum Move {
 use Move::*;
 
 pub fn block_id_to_string(parts: &[usize]) -> String {
-    parts.iter().map(|p| p.to_string()).collect::<Vec<String>>().join(",")
+    parts.iter().map(|p| p.to_string()).collect::<Vec<String>>().join(".")
 }
 
 impl std::fmt::Display for Move {
@@ -91,6 +91,7 @@ fn test_move_to_string() {
     let moves = vec![
         Move::Color { block_id: vec![0], color: Color { r: 146, g: 149, b: 120, a: 223 } },
         Move::LCut { block_id: vec![0], orientation: Horizontal, line_number: 160 },
+        Move::Color { block_id: vec![0, 1], color: Color { r: 1, g: 2, b: 3, a: 4 } },
     ];
 
     let mut res = String::new();
@@ -101,6 +102,7 @@ fn test_move_to_string() {
     assert_eq!(res, "\
 color [0] [146, 149, 120, 223]
 cut [0] [y] [160]
+color [0.1] [1, 2, 3, 4]
 ");
 }
 
