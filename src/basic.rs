@@ -596,7 +596,7 @@ fn render_moves_example() {
 fn test_split_merge() {
     let mut painter = PainterState::new(100, 100);
     painter.apply_move(&LCut {
-        block_id: BlockId(vec![0]),
+        block_id: BlockId::root(0),
         orientation: Orientation::Horizontal,
         line_number: 50,
     });
