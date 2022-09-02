@@ -9,14 +9,26 @@ type Command =
     | {type: "merge", block1: BlockId, block2: BlockId}
     | {type: "comment", text: string}
 
+const base_costs: { [K in Command['type']]: number } = {
+    "cut-line": 7,
+    "cut-point": 10,
+    "color": 5,
+    "swap": 3,
+    "merge": 1,
+    "comment": 0,
+}
+
 type BlockId = string
 type Point = [number, number]
 type Orientation = "x" | "y"
 type Color = [number, number, number, number]
 type Block = { x: number, y: number, c: HTMLCanvasElement }
 
+type Rect = {width:number, height:number}
+
 const inputBox = document.getElementById("input") as HTMLTextAreaElement;
 const run = document.getElementById("run")!;
+const costSpan = document.getElementById("cost") as HTMLSpanElement;
 const parser = new Parser();
 
 function copyFrom(c: HTMLCanvasElement, sx: number, sy: number, sw: number, sh: number) {
@@ -30,6 +42,14 @@ function copyFrom(c: HTMLCanvasElement, sx: number, sy: number, sw: number, sh: 
     return newCanvas;
 }
 
+function size(rect: Rect) {
+    return rect.width*rect.height;
+}
+
+function step_cost(type: keyof typeof base_costs, canvas: Rect, block: Rect) {
+    return Math.round(base_costs[type] * size(canvas)/size(block));
+}
+
 run.addEventListener('click', () => {
     const input = inputBox.value;
     const parsed = parser.parse(lex(input)).filter((x: any) => x !== null) as Command[];
@@ -39,7 +59,7 @@ run.addEventListener('click', () => {
     canvas0.width=400
     canvas0.height=400
     const ctx0 = canvas0.getContext('2d')!;
-    ctx0.fillStyle="rgba(0,0,0,0)"
+    ctx0.fillStyle="rgba(255,255,255,255)"
     ctx0.fillRect(0, 0, 400, 400);
     blocks.set("0", {x: 0, y: 0, c: canvas0})
 
@@ -54,13 +74,19 @@ run.addEventListener('click', () => {
         const blkName = `${counter}`;
         counter += 1;
         blocks.set(blkName, newBlock);
+        return newBlock;
     }
+    let cost = 0;
 
     for (const cmd of parsed) {
+        const cost_est = step_cost.bind(this, cmd.type, canvas0);
         switch(cmd.type) {
             case "cut-point": {
                 const blk = blocks.get(cmd.block);
                 if (!blk) throw new Error(`No such block: ${cmd.block}`);
+                cost += cost_est(blk.c);
+                cmd.point[0] -= blk.x;
+                cmd.point[1] -= blk.y;
                 if (cmd.point[0] == 0 || cmd.point[0] >= blk.c.width) throw new Error('Point is on block border in x dimension');
                 if (cmd.point[1] == 0 || cmd.point[1] >= blk.c.height) throw new Error('Point is on block border in y dimension');
                 blocks.delete(cmd.block);
@@ -76,8 +102,14 @@ run.addEventListener('click', () => {
             case "cut-line": {
                 const blk = blocks.get(cmd.block);
                 if (!blk) throw new Error(`No such block: ${cmd.block}`);
+                cost += cost_est(blk.c);
                 const blksize = cmd.dir == "x" ? blk.c.width : blk.c.height;
-                if (cmd.num == 0 || cmd.num >= blksize) throw new Error(`Point is on block border in ${cmd.dir} dimension`);
+                if (cmd.dir === "x") {
+                    cmd.num -= blk.x;
+                } else if (cmd.dir === "y") {
+                    cmd.num -= blk.y;
+                }
+                if (cmd.num === 0 || cmd.num >= blksize) throw new Error(`Point is on block border in ${cmd.dir} dimension`);
                 blocks.delete(cmd.block);
                 if (cmd.dir === "x") {
                     blocks.set(`${cmd.block}.0`, { x: blk.x, y: blk.y,
@@ -95,6 +127,7 @@ run.addEventListener('click', () => {
             case "color": {
                 const blk = blocks.get(cmd.block);
                 if (!blk) throw new Error(`No such block: ${cmd.block}`);
+                cost += cost_est(blk.c);
                 const ctx = blk.c.getContext('2d')!;
                 // a hack to behave like the playground: pre-fill with white
                 ctx.fillStyle='rgba(255,255,255,1)';
@@ -112,6 +145,7 @@ run.addEventListener('click', () => {
                 if (blk1.c.width !== blk2.c.width || blk1.c.height !== blk2.c.height) {
                     throw new Error(`Block shapes are incompatible for ${cmd.block1} and ${cmd.block2}`);
                 }
+                cost += cost_est(blk1.c);
                 const x1 = blk1.x;
                 const y1 = blk1.y;
                 blk1.x = blk2.x;
@@ -132,7 +166,8 @@ run.addEventListener('click', () => {
                     blk1.y -= minY;
                     blk2.y -= minY;
                     blk1.x = blk2.x = 0;
-                    mergeBlocks(oldX, minY, blk1.c.width, blk1.c.height + blk2.c.height, blk1, blk2);
+                    const nb = mergeBlocks(oldX, minY, blk1.c.width, blk1.c.height + blk2.c.height, blk1, blk2);
+                    cost += cost_est(nb.c);
                 } else if (blk1.y === blk2.y) {
                     if (blk1.c.height !== blk2.c.height) throw new Error("Blocks are not compatible for merge: height differs");
                     const minX = Math.min(blk1.x, blk2.x);
@@ -140,7 +175,8 @@ run.addEventListener('click', () => {
                     blk1.x -= minX;
                     blk2.x -= minX;
                     blk1.y = blk2.y = 0;
-                    mergeBlocks(minX, oldY, blk1.c.width + blk2.c.width, blk1.c.height, blk1, blk2);
+                    const nb = mergeBlocks(minX, oldY, blk1.c.width + blk2.c.width, blk1.c.height, blk1, blk2);
+                    cost += cost_est(nb.c);
                 } else {
                     throw new Error("Blocks to be merged are not aligned");
                 }
@@ -157,4 +193,5 @@ run.addEventListener('click', () => {
     for(const v of blocks.values()) {
         ctx.drawImage(v.c, v.x, v.y);
     }
+    costSpan.innerText = `Cost: ${cost}`;
 });
