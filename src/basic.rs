@@ -307,38 +307,17 @@ impl PainterState {
             Swap { block_id1, block_id2 } => {
                 let mut block1 = self.blocks.remove(block_id1).unwrap();
                 let mut block2 = self.blocks.remove(block_id2).unwrap();
-                assert_eq!(block1.shape.width(), block2.shape.width());
-                assert_eq!(block1.shape.height(), block2.shape.height());
-
-                let dx = block2.shape.x1 - block1.shape.x1;
-                let dy = block2.shape.y1 - block1.shape.y1;
-
-                for p in &mut block1.pieces {
-                    p.0.x1 += dx;
-                    p.0.x2 += dx;
-                    p.0.y1 += dy;
-                    p.0.y2 += dy;
-                }
-                for p in &mut block2.pieces {
-                    p.0.x1 -= dx;
-                    p.0.x2 -= dx;
-                    p.0.y1 -= dy;
-                    p.0.y2 -= dy;
-                }
-                std::mem::swap(&mut block1.shape, &mut block2.shape);
-
+                swap_blocks(&mut block1, &mut block2);
                 base_cost = 3;
                 block_size = block1.shape.size();
-
                 self.blocks.insert(block_id1.clone(), block1);
                 self.blocks.insert(block_id2.clone(), block2);
             }
             Merge { block_id1, block_id2 } => {
                 let block1 = self.blocks.remove(block_id1).unwrap();
                 let block2 = self.blocks.remove(block_id2).unwrap();
-                let new_shape = merge_shapes(block1.shape, block2.shape);
                 let mut new_block = Block {
-                    shape: new_shape,
+                    shape: merge_shapes(block1.shape, block2.shape),
                     pieces: block1.pieces,
                 };
                 new_block.pieces.extend(block2.pieces);
@@ -405,6 +384,28 @@ fn merge_shapes(shape1: Shape, shape2: Shape) -> Shape {
     } else {
         panic!("merging blocks that are not adjacent {:?} {:?}", shape1, shape2);
     }
+}
+
+fn swap_blocks(block1: &mut Block, block2: &mut Block) {
+    assert_eq!(block1.shape.width(), block2.shape.width());
+    assert_eq!(block1.shape.height(), block2.shape.height());
+
+    let dx = block2.shape.x1 - block1.shape.x1;
+    let dy = block2.shape.y1 - block1.shape.y1;
+
+    for p in &mut block1.pieces {
+        p.0.x1 += dx;
+        p.0.x2 += dx;
+        p.0.y1 += dy;
+        p.0.y2 += dy;
+    }
+    for p in &mut block2.pieces {
+        p.0.x1 -= dx;
+        p.0.x2 -= dx;
+        p.0.y1 -= dy;
+        p.0.y2 -= dy;
+    }
+    std::mem::swap(&mut block1.shape, &mut block2.shape);
 }
 
 pub fn image_distance(img1: &image::RgbaImage, img2: &image::RgbaImage) -> f64 {
