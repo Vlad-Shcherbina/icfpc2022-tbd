@@ -420,7 +420,7 @@ pub fn image_distance(img1: &image::RgbaImage, img2: &image::RgbaImage) -> f64 {
         }
         res += (d2 as f64).sqrt();
     }
-    res *= 0.05;
+    res *= 0.005;
     res
 }
 
@@ -429,7 +429,7 @@ fn render_moves_example() {
     let moves = vec![
         Move::Color {
             block_id: vec![0],
-            color: Color { r: 0, g: 0, b: 255, a: 255 },
+            color: Color { r: 0, g: 74, b: 173, a: 255 },
         },
         PCut {
             block_id: vec![0],
@@ -455,6 +455,7 @@ fn render_moves_example() {
     let target = image::open(crate::util::project_path(target_path)).unwrap().to_rgba8();
     let dist = image_distance(&img, &target);
     eprintln!("distance to {} is {}", target_path, dist);
+    eprintln!("final score: {}", dist.round() as i32 + painter.cost);
 
     let path = "outputs/render_moves_example.png";
     img.save(crate::util::project_path(path)).unwrap();
