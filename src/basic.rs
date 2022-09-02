@@ -347,41 +347,7 @@ impl PainterState {
             Merge { block_id1, block_id2 } => {
                 let block1 = self.blocks.remove(block_id1).unwrap();
                 let block2 = self.blocks.remove(block_id2).unwrap();
-                let new_shape = if block1.shape.x2 == block2.shape.x1 && block1.shape.y1 == block2.shape.y1 && block1.shape.y2 == block2.shape.y2 {
-                    // 1 to the left of 2
-                    Shape {
-                        x1: block1.shape.x1,
-                        y1: block1.shape.y1,
-                        x2: block2.shape.x2,
-                        y2: block2.shape.y2,
-                    }
-                } else if block2.shape.x1 == block1.shape.x2 && block1.shape.y1 == block2.shape.y1 && block1.shape.y2 == block2.shape.y2 {
-                    // 2 to the left of 1
-                    Shape {
-                        x1: block2.shape.x1,
-                        y1: block2.shape.y1,
-                        x2: block1.shape.x2,
-                        y2: block1.shape.y2,
-                    }
-                } else if block1.shape.y2 == block2.shape.y1 && block1.shape.x1 == block2.shape.x1 && block1.shape.x2 == block2.shape.x2 {
-                    // 2 on top of 1
-                    Shape {
-                        x1: block1.shape.x1,
-                        y1: block1.shape.y1,
-                        x2: block2.shape.x2,
-                        y2: block2.shape.y2,
-                    }
-                } else if block2.shape.y2 == block1.shape.y1 && block1.shape.x1 == block2.shape.x1 && block1.shape.x2 == block2.shape.x2 {
-                    // 1 on top of 2
-                    Shape {
-                        x1: block2.shape.x1,
-                        y1: block2.shape.y1,
-                        x2: block1.shape.x2,
-                        y2: block1.shape.y2,
-                    }
-                } else {
-                    panic!("merging blocks that are not adjacent {:?} {:?}", block1.shape, block2.shape);
-                };
+                let new_shape = merge_shapes(block1.shape, block2.shape);
                 let mut new_block = Block {
                     shape: new_shape,
                     pieces: block1.pieces,
@@ -411,6 +377,44 @@ impl PainterState {
             }
         }
         res
+    }
+}
+
+fn merge_shapes(shape1: Shape, shape2: Shape) -> Shape {
+    if shape1.x2 == shape2.x1 && shape1.y1 == shape2.y1 && shape1.y2 == shape2.y2 {
+        // 1 to the left of 2
+        Shape {
+            x1: shape1.x1,
+            y1: shape1.y1,
+            x2: shape2.x2,
+            y2: shape2.y2,
+        }
+    } else if shape2.x1 == shape1.x2 && shape1.y1 == shape2.y1 && shape1.y2 == shape2.y2 {
+        // 2 to the left of 1
+        Shape {
+            x1: shape2.x1,
+            y1: shape2.y1,
+            x2: shape1.x2,
+            y2: shape1.y2,
+        }
+    } else if shape1.y2 == shape2.y1 && shape1.x1 == shape2.x1 && shape1.x2 == shape2.x2 {
+        // 2 on top of 1
+        Shape {
+            x1: shape1.x1,
+            y1: shape1.y1,
+            x2: shape2.x2,
+            y2: shape2.y2,
+        }
+    } else if shape2.y2 == shape1.y1 && shape1.x1 == shape2.x1 && shape1.x2 == shape2.x2 {
+        // 1 on top of 2
+        Shape {
+            x1: shape2.x1,
+            y1: shape2.y1,
+            x2: shape1.x2,
+            y2: shape1.y2,
+        }
+    } else {
+        panic!("merging blocks that are not adjacent {:?} {:?}", shape1, shape2);
     }
 }
 
