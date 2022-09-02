@@ -33,7 +33,7 @@ fn dummy_solver() {
         }
     ];
 
-    let mut painter = PainterState::new(400, 400);
+    let mut painter = PainterState::new(target.width() as i32, target.height() as i32);
     for m in &moves {
         eprintln!("{}", m);
         painter.apply_move(m);
