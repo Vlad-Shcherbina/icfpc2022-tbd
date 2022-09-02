@@ -1,12 +1,13 @@
 pub fn create_client() -> postgres::Client {
     postgres::Client::connect(
-        "postgresql://icfpc2022_playground:tc83ktc83mt@35.188.223.28:8032/icfpc2022_playground",
+        "postgresql://postgres:stjda743vrs98t32nkdas09@35.195.192.0",
         postgres::NoTls).unwrap()
 }
 
 crate::entry_point!("init_tables", init_tables);
 fn init_tables() {
     let mut client = create_client();
+    crate::invocation::create_table(&mut client);
     client.batch_execute(r#"
     CREATE TABLE IF NOT EXISTS solutions(
         id SERIAL PRIMARY KEY,
@@ -22,6 +23,4 @@ fn init_tables() {
         timestamp TIMESTAMP WITH TIME ZONE NOT NULL
     );
     "#).unwrap();
-
-    crate::invocation::create_table(&mut client);
 }
