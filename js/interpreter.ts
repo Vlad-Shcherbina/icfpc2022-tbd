@@ -28,7 +28,10 @@ type Rect = {width:number, height:number}
 
 const inputBox = document.getElementById("input") as HTMLTextAreaElement;
 const run = document.getElementById("run")!;
+const back = document.getElementById("back")!;
+const forward = document.getElementById("forward")!;
 const costSpan = document.getElementById("cost") as HTMLSpanElement;
+const stepSpan = document.getElementById("step") as HTMLSpanElement;
 const parser = new Parser();
 
 function copyFrom(c: HTMLCanvasElement, sx: number, sy: number, sw: number, sh: number) {
@@ -50,18 +53,46 @@ function step_cost(type: keyof typeof base_costs, canvas: Rect, block: Rect) {
     return Math.round(base_costs[type] * size(canvas)/size(block));
 }
 
+let exec_steps: Array<{blocks: Map<string, Block>, cost: number, cmd: Command}> = []
+
+function save_step(blocks: Map<string, Block>, this_step_cost: number, cmd: Command) {
+    const step = { cost: this_step_cost, blocks: new Map<string, Block>(), cmd };
+    for (const [k, v] of blocks.entries()) {
+        const canvas = document.createElement('canvas');
+        canvas.width = v.c.width;
+        canvas.height = v.c.height;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(v.c, 0, 0);
+        step.blocks.set(k, {x: v.x, y: v.y, c: canvas});
+    }
+    exec_steps.push(step);
+}
+
+function render(blocks: Map<string, Block>) {
+    const canvas = document.getElementById("canvas") as HTMLCanvasElement;
+    const ctx = canvas.getContext("2d")!;
+    for(const v of blocks.values()) {
+        ctx.drawImage(v.c, v.x, v.y);
+    }
+}
+
+let currentIndex = 0;
+
 run.addEventListener('click', () => {
     const input = inputBox.value;
     const parsed = parser.parse(lex(input)).filter((x: any) => x !== null) as Command[];
     const blocks = new Map<string, Block>();
+    exec_steps = [];
+    currentIndex = 0;
     let counter = 1;
     const canvas0 = document.createElement('canvas');
     canvas0.width=400
     canvas0.height=400
     const ctx0 = canvas0.getContext('2d')!;
-    ctx0.fillStyle="rgba(255,255,255,255)"
+    ctx0.fillStyle="rgba(255,255,255,1)"
     ctx0.fillRect(0, 0, 400, 400);
     blocks.set("0", {x: 0, y: 0, c: canvas0})
+    save_step(blocks, 0, {type: "comment", text: "Initial state"});
 
     function mergeBlocks(x:number, y: number, w: number, h: number, blk1: Block, blk2: Block) {
         const canvas1 = document.createElement('canvas');
@@ -79,12 +110,13 @@ run.addEventListener('click', () => {
     let cost = 0;
 
     for (const cmd of parsed) {
+        let this_step_cost: number;
         const cost_est = step_cost.bind(this, cmd.type, canvas0);
         switch(cmd.type) {
             case "cut-point": {
                 const blk = blocks.get(cmd.block);
                 if (!blk) throw new Error(`No such block: ${cmd.block}`);
-                cost += cost_est(blk.c);
+                this_step_cost = cost_est(blk.c);
                 cmd.point[0] -= blk.x;
                 cmd.point[1] -= blk.y;
                 if (cmd.point[0] == 0 || cmd.point[0] >= blk.c.width) throw new Error('Point is on block border in x dimension');
@@ -102,7 +134,7 @@ run.addEventListener('click', () => {
             case "cut-line": {
                 const blk = blocks.get(cmd.block);
                 if (!blk) throw new Error(`No such block: ${cmd.block}`);
-                cost += cost_est(blk.c);
+                this_step_cost = cost_est(blk.c);
                 const blksize = cmd.dir == "x" ? blk.c.width : blk.c.height;
                 if (cmd.dir === "x") {
                     cmd.num -= blk.x;
@@ -127,7 +159,7 @@ run.addEventListener('click', () => {
             case "color": {
                 const blk = blocks.get(cmd.block);
                 if (!blk) throw new Error(`No such block: ${cmd.block}`);
-                cost += cost_est(blk.c);
+                this_step_cost = cost_est(blk.c);
                 const ctx = blk.c.getContext('2d')!;
                 // a hack to behave like the playground: pre-fill with white
                 ctx.fillStyle='rgba(255,255,255,1)';
@@ -145,7 +177,7 @@ run.addEventListener('click', () => {
                 if (blk1.c.width !== blk2.c.width || blk1.c.height !== blk2.c.height) {
                     throw new Error(`Block shapes are incompatible for ${cmd.block1} and ${cmd.block2}`);
                 }
-                cost += cost_est(blk1.c);
+                this_step_cost = cost_est(blk1.c);
                 const x1 = blk1.x;
                 const y1 = blk1.y;
                 blk1.x = blk2.x;
@@ -167,7 +199,7 @@ run.addEventListener('click', () => {
                     blk2.y -= minY;
                     blk1.x = blk2.x = 0;
                     const nb = mergeBlocks(oldX, minY, blk1.c.width, blk1.c.height + blk2.c.height, blk1, blk2);
-                    cost += cost_est(nb.c);
+                    this_step_cost = cost_est(nb.c);
                 } else if (blk1.y === blk2.y) {
                     if (blk1.c.height !== blk2.c.height) throw new Error("Blocks are not compatible for merge: height differs");
                     const minX = Math.min(blk1.x, blk2.x);
@@ -176,7 +208,7 @@ run.addEventListener('click', () => {
                     blk2.x -= minX;
                     blk1.y = blk2.y = 0;
                     const nb = mergeBlocks(minX, oldY, blk1.c.width + blk2.c.width, blk1.c.height, blk1, blk2);
-                    cost += cost_est(nb.c);
+                    this_step_cost = cost_est(nb.c);
                 } else {
                     throw new Error("Blocks to be merged are not aligned");
                 }
@@ -185,13 +217,46 @@ run.addEventListener('click', () => {
                 break;
             }
             case "comment":
+                this_step_cost = 0;
                 break;
         }
+        cost += this_step_cost;
+        save_step(blocks, this_step_cost, cmd);
     }
-    const canvas = document.getElementById("canvas") as HTMLCanvasElement;
-    const ctx = canvas.getContext("2d")!;
-    for(const v of blocks.values()) {
-        ctx.drawImage(v.c, v.x, v.y);
-    }
+    render(blocks);
     costSpan.innerText = `Cost: ${cost}`;
 });
+
+function selectCurrentCommand() {
+    const text = inputBox.value;
+    const lines = text.split('\n');
+    let posStart = 0;
+    for(const line of lines.slice(0, currentIndex-1)) {
+        posStart += line.length+1;
+    }
+    const lastLine = lines[currentIndex-1];
+    if (lastLine === undefined) return;
+    const posEnd = posStart + lastLine.length + 1;
+    inputBox.focus();
+    inputBox.setSelectionRange(posStart, posEnd);
+}
+
+back.addEventListener('click', () => {
+    currentIndex -= 1;
+    if (currentIndex < 0) currentIndex = exec_steps.length - 1;
+    const step = exec_steps[currentIndex];
+    if(!step) return;
+    render(step.blocks);
+    selectCurrentCommand();
+    stepSpan.innerText = `Current step: ${JSON.stringify(step.cmd)}; Step cost: ${step.cost}`;
+})
+
+forward.addEventListener('click', () => {
+    currentIndex += 1;
+    if (currentIndex >= exec_steps.length) currentIndex = 0;
+    const step = exec_steps[currentIndex];
+    if(!step) return;
+    render(step.blocks);
+    selectCurrentCommand();
+    stepSpan.innerText = `Current step: ${JSON.stringify(step.cmd)}; Step cost: ${step.cost}`;
+})
