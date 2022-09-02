@@ -124,6 +124,37 @@ impl Shape {
     pub fn size(&self) -> i32 {
         self.width() * self.height()
     }
+
+    fn p_cut_subshapes(&self, x: i32, y: i32) -> [Shape; 4] {
+        assert!(self.x1 < x && x < self.x2);
+        assert!(self.y1 < y && y < self.y2);
+        [
+            Shape {
+                x1: self.x1,
+                y1: self.y1,
+                x2: x,
+                y2: y,
+            },
+            Shape {
+                x1: x,
+                y1: self.y1,
+                x2: self.x2,
+                y2: y,
+            },
+            Shape {
+                x1: x,
+                y1: y,
+                x2: self.x2,
+                y2: self.y2,
+            },
+            Shape {
+                x1: self.x1,
+                y1: y,
+                x2: x,
+                y2: self.y2,
+            },
+        ]
+    }
 }
 
 #[derive(PartialEq)]
@@ -206,52 +237,13 @@ impl PainterState {
         let block_size;
         match m {
             PCut { block_id, x, y } => {
-                let x = *x;
-                let y = *y;
                 let block = self.blocks.remove(block_id).unwrap();
-                assert!(block.shape.x1 < x && x < block.shape.x2);
-                assert!(block.shape.y1 < y && y < block.shape.y2);
-
-                let new_block = block.sub_block(Shape {
-                    x1: block.shape.x1,
-                    y1: block.shape.y1,
-                    x2: x,
-                    y2: y,
-                });
-                let mut new_block_id = block_id.clone();
-                new_block_id.push(0);
-                self.blocks.insert(new_block_id, new_block);
-
-                let new_block = block.sub_block(Shape {
-                    x1: x,
-                    y1: block.shape.y1,
-                    x2: block.shape.x2,
-                    y2: y,
-                });
-                let mut new_block_id = block_id.clone();
-                new_block_id.push(1);
-                self.blocks.insert(new_block_id, new_block);
-
-                let new_block = block.sub_block(Shape {
-                    x1: x,
-                    y1: y,
-                    x2: block.shape.x2,
-                    y2: block.shape.y2,
-                });
-                let mut new_block_id = block_id.clone();
-                new_block_id.push(2);
-                self.blocks.insert(new_block_id, new_block);
-
-                let new_block = block.sub_block(Shape {
-                    x1: block.shape.x1,
-                    y1: y,
-                    x2: x,
-                    y2: block.shape.y2,
-                });
-                let mut new_block_id = block_id.clone();
-                new_block_id.push(3);
-                self.blocks.insert(new_block_id, new_block);
-
+                for (i, ss) in block.shape.p_cut_subshapes(*x, *y).into_iter().enumerate() {
+                    let new_block = block.sub_block(ss);
+                    let mut new_block_id = block_id.clone();
+                    new_block_id.push(i);
+                    self.blocks.insert(new_block_id, new_block);
+                }
                 base_cost = 10;
                 block_size = block.shape.size();
             }
