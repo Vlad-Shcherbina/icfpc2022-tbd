@@ -10,6 +10,7 @@
 
 use crate::util::project_path;
 use crate::basic::*;
+use crate::image::Image;
 
 crate::entry_point!("dummy_solver", dummy_solver);
 fn dummy_solver() {
@@ -20,11 +21,10 @@ fn dummy_solver() {
     }
     let problem_id: i32 = args[0].parse().unwrap();
 
-    let target = image::open(project_path(format!("data/problems/{}.png", problem_id))).unwrap().to_rgba8();
+    let target = Image::load(&project_path(format!("data/problems/{}.png", problem_id)));
 
     // Just take some color from the target image.
     let color = target.get_pixel(0, 0);
-    let color = Color { r: color.0[0], g: color.0[1], b: color.0[2], a: color.0[3] };
 
     let moves = vec![
         Move::Color {
@@ -33,7 +33,7 @@ fn dummy_solver() {
         }
     ];
 
-    let mut painter = PainterState::new(target.width() as i32, target.height() as i32);
+    let mut painter = PainterState::new(target.width, target.height);
     for m in &moves {
         eprintln!("{}", m);
         painter.apply_move(m);
@@ -47,6 +47,6 @@ fn dummy_solver() {
     eprintln!("final score: {}", dist.round() as i32 + painter.cost);
 
     let output_path = format!("outputs/dummy_{}.png", problem_id);
-    img.save(crate::util::project_path(&output_path)).unwrap();
+    img.save(&crate::util::project_path(&output_path));
     eprintln!("saved to {}", output_path);
 }

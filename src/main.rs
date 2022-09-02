@@ -8,6 +8,7 @@ mod print_invocations;
 pub mod basic;
 mod qtree;
 mod solvers;
+mod image;
 
 crate::entry_point!("hello", hello);
 fn hello() {

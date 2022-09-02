@@ -1,13 +1,15 @@
 use std::fs::File;
-use std::path::PathBuf;
+use std::path::Path;
 use image::{imageops, Rgba, RgbaImage};
+use crate::image::Image;
 use crate::basic::{BlockId, Color, image_distance, Move, PainterState, Shape};
 use crate::basic::Move::PCut;
 use crate::util::project_path;
 use std::io::Write;
+
 crate::entry_point!("qtree", qtree);
 
-fn read_img(path: PathBuf) -> image::RgbaImage {
+fn read_img(path: &Path) -> image::RgbaImage {
     let img = image::open(path).unwrap();
     img.to_rgba8()
 }
@@ -41,12 +43,17 @@ impl State {
     }
 
     fn potential_gain(&self, painter_state: &PainterState, shape: Shape) -> i32 {
-        let img = painter_state.render();
+        let img = painter_state.render().to_raw_image();
         let cropped_actual = crop(&img, shape);
+        let cropped_actual = Image::from_raw_image(&cropped_actual);
         let cropped_target = crop(&self.img, shape);
+        let cropped_target = Image::from_raw_image(&cropped_target);
+        // Sorry, these look like ugly and unnecessary conversions,
+        // but I'm in a middle of a big refactoring (RgbaImage -> Image),
+        // so doing what't easy to do.
         let res =
             image_distance(&cropped_target, &cropped_actual) as i32;
-        println!("COMPARE {} {} {} {} = {}", cropped_target.width(), cropped_target.height(), cropped_actual.width(), cropped_actual.height(), res);
+        println!("COMPARE {} {} {} {} = {}", cropped_target.width, cropped_target.height, cropped_actual.width, cropped_actual.height, res);
         res
     }
 
@@ -66,12 +73,12 @@ impl State {
                 pixels += 1;
             }
         }
-        Color {
-            r: (r / pixels) as u8,
-            g: (g / pixels) as u8,
-            b: (b / pixels) as u8,
-            a: (a / pixels) as u8,
-        }
+        Color([
+            (r / pixels) as u8,
+            (g / pixels) as u8,
+            (b / pixels) as u8,
+            (a / pixels) as u8,
+        ])
     }
 
     fn qtree_stop_here_recolor_cost(&self, shape: Shape, block_id: BlockId) -> i32 {
@@ -145,9 +152,12 @@ impl State {
 fn qtree() {
     let problem_id = 9;
     let path = project_path(format!("data/problems/{}.png", problem_id));
-    let img = read_img(path);
-    let mut painter_state = PainterState::new(img.width() as i32, img.height() as i32);
-    let mut state = State::new(img.clone());
+
+    let raw_img = read_img(&path);  // TODO: maybe get rid of image::RgbaImage altogether in favor of our Image
+    let img = Image::load(&path);
+
+    let mut painter_state = PainterState::new(img.width, img.height);
+    let mut state = State::new(raw_img);
     let (moves, cost) = state.solve();
     let mut out_file = File::create(project_path(format!("outputs/qtree{}.txt", problem_id))).unwrap();
     for mv in moves {
@@ -162,6 +172,5 @@ fn qtree() {
     println!("Program cost:  {}", painter_state.cost);
     println!("Total cost:    {}", img_dist as u64 + painter_state.cost as u64);
     println!("Total cost2:   {}", cost);
-    res_img.save(out_path).unwrap();
+    res_img.save(&out_path);
 }
-

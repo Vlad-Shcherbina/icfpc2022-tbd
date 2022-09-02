@@ -3,14 +3,10 @@
 
 use std::collections::HashMap;
 use std::fmt::{Formatter, Write};
+use crate::image::Image;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct Color {
-    pub r: u8,
-    pub g: u8,
-    pub b: u8,
-    pub a: u8,
-}
+pub struct Color(pub [u8; 4]);
 
 #[derive(Debug, Clone, Copy)]
 pub enum Orientation {
@@ -95,7 +91,7 @@ impl std::fmt::Display for Move {
             Move::Color {
                 block_id,
                 color,
-            } => write!(f, "color [{}] [{}, {}, {}, {}]", block_id, color.r, color.g, color.b, color.a),
+            } => write!(f, "color [{}] [{}, {}, {}, {}]", block_id, color.0[0], color.0[1], color.0[2], color.0[3]),  // TODO: use color as Display
             Swap {
                 block_id1,
                 block_id2,
@@ -116,12 +112,12 @@ impl Move {
             let s = s.strip_prefix('[').unwrap();
             let s = s.strip_suffix(']').unwrap();
             let mut it = s.split(',');
-            let color = Color {
-                r: it.next().unwrap().parse().unwrap(),
-                g: it.next().unwrap().parse().unwrap(),
-                b: it.next().unwrap().parse().unwrap(),
-                a: it.next().unwrap().parse().unwrap(),
-            };
+            let color = Color([
+                it.next().unwrap().parse().unwrap(),
+                it.next().unwrap().parse().unwrap(),
+                it.next().unwrap().parse().unwrap(),
+                it.next().unwrap().parse().unwrap(),
+            ]);
             assert!(it.next().is_none());
             return Move::Color {
                 block_id,
@@ -207,9 +203,9 @@ fn test_string_to_move_and_back() {
 #[test]
 fn test_move_to_string() {
     let moves = vec![
-        Move::Color { block_id: BlockId::root(0), color: Color { r: 146, g: 149, b: 120, a: 223 } },
+        Move::Color { block_id: BlockId::root(0), color: Color([146, 149, 120, 223]) },
         Move::LCut { block_id: BlockId::root(0), orientation: Horizontal, line_number: 160 },
-        Move::Color { block_id: BlockId::root(0).child(1), color: Color { r: 1, g: 2, b: 3, a: 4 } },
+        Move::Color { block_id: BlockId::root(0).child(1), color: Color([1, 2, 3, 4]) },
     ];
 
     let mut res = String::new();
@@ -240,7 +236,7 @@ impl std::fmt::Display for Shape {
 
 impl std::fmt::Display for Color {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{}, {}, {}, {}]", self.r, self.g, self.b, self.a)
+        write!(f, "[{}, {}, {}, {}]", self.0[0], self.0[1], self.0[2], self.0[3])
     }
 }
 
@@ -367,7 +363,7 @@ impl Block {
 fn test_sub_block() {
     let shape = Shape {x1: 10, y1: 110, x2: 20, y2: 120};
     let shape2 = Shape {x1: 11, y1: 111, x2: 13, y2: 113};
-    let c = Color {r: 1, g: 2, b: 3, a: 4};
+    let c = Color([1, 2, 3, 4]);
     let block = Block {
         shape: shape,
         pieces: vec![(shape.clone(), c)]
@@ -392,7 +388,7 @@ impl PainterState {
         let shape = Shape { x1: 0, y1: 0, x2: width, y2: height };
         blocks.insert(BlockId::root(0), Block {
             shape,
-            pieces: vec![(shape, Color { r: 0, g: 0, b: 0, a: 0 })],
+            pieces: vec![(shape, Color([0, 0, 0, 0]))],
         });
         PainterState {
             width,
@@ -464,14 +460,13 @@ impl PainterState {
         extra_cost
     }
 
-    pub fn render(&self) -> image::RgbaImage {
-        let mut res = image::RgbaImage::new(self.width as u32, self.height as u32);
+    pub fn render(&self) -> Image {
+        let mut res = Image::new(self.width, self.height, Color::default());
         for block in self.blocks.values() {
             for (shape, color) in &block.pieces {
-                let c = image::Rgba([color.r, color.g, color.b, color.a]);
                 for x in shape.x1..shape.x2 {
                     for y in shape.y1..shape.y2 {
-                        res.put_pixel(x as u32, (self.height - 1 - y) as u32, c);
+                        res.set_pixel(x, y, *color);
                     }
                 }
             }
@@ -540,17 +535,20 @@ fn swap_blocks(block1: &mut Block, block2: &mut Block) {
     std::mem::swap(&mut block1.shape, &mut block2.shape);
 }
 
-pub fn image_distance(img1: &image::RgbaImage, img2: &image::RgbaImage) -> f64 {
-    assert_eq!(img1.width(), img2.width());
-    assert_eq!(img1.height(), img2.height());
+pub fn image_distance(img1: &Image, img2: &Image) -> f64 {
+    assert_eq!(img1.width, img2.width);
+    assert_eq!(img1.height, img2.height);
     let mut res = 0.0f64;
-    for (x, y, pixel1) in img1.enumerate_pixels() {
-        let pixel2 = img2.get_pixel(x, y);
-        let mut d2 = 0;
-        for i in 0..4 {
-            d2 += (pixel1[i] as i32 - pixel2[i] as i32).pow(2);
+    for y in 0..img1.height {
+        for x in 0..img1.width {
+            let c1 = img1.get_pixel(x, y);
+            let c2 = img2.get_pixel(x, y);
+            let mut d2 = 0;
+            for i in 0..4 {
+                d2 += (c1.0[i] as i32 - c2.0[i] as i32).pow(2);
+            }
+            res += (d2 as f64).sqrt();
         }
-        res += (d2 as f64).sqrt();
     }
     res *= 0.005;
     res
@@ -561,7 +559,7 @@ fn render_moves_example() {
     let moves = vec![
         Move::Color {
             block_id: BlockId::root(0),
-            color: Color { r: 0, g: 74, b: 173, a: 255 },
+            color: Color([0, 74, 173, 255]),
         },
         PCut {
             block_id: BlockId::root(0),
@@ -570,7 +568,7 @@ fn render_moves_example() {
         },
         Move::Color {
             block_id: BlockId::root(0).child(3),
-            color: Color { r: 128, g: 128, b: 128, a: 255 },
+            color: Color([128, 128, 128, 255]),
         },
     ];
     let mut painter = PainterState::new(400, 400);
@@ -584,13 +582,13 @@ fn render_moves_example() {
     let img = painter.render();
 
     let target_path = "data/problems/1.png";
-    let target = image::open(crate::util::project_path(target_path)).unwrap().to_rgba8();
+    let target = Image::load(&crate::util::project_path(target_path));
     let dist = image_distance(&img, &target);
     eprintln!("distance to {} is {}", target_path, dist);
     eprintln!("final score: {}", dist.round() as i32 + painter.cost);
 
     let path = "outputs/render_moves_example.png";
-    img.save(crate::util::project_path(path)).unwrap();
+    img.save(&crate::util::project_path(path));
     eprintln!();
     eprintln!("saved to {}", path);
 }
