@@ -6,7 +6,6 @@ mod db;
 mod invocation;
 mod print_invocations;
 pub mod basic;
-mod qtree;
 mod solvers;
 mod image;
 mod uploader;

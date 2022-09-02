@@ -535,14 +535,12 @@ fn swap_blocks(block1: &mut Block, block2: &mut Block) {
     std::mem::swap(&mut block1.shape, &mut block2.shape);
 }
 
-pub fn image_distance(img1: &Image, img2: &Image) -> f64 {
-    assert_eq!(img1.width, img2.width);
-    assert_eq!(img1.height, img2.height);
+pub fn image_slice_distance(img1: &Image, img2: &Image , x1: i32, y1: i32, x2: i32, y2: i32, w: i32, h: i32) -> f64 {
     let mut res = 0.0f64;
-    for y in 0..img1.height {
-        for x in 0..img1.width {
-            let c1 = img1.get_pixel(x, y);
-            let c2 = img2.get_pixel(x, y);
+    for dy in 0..h {
+        for dx in 0..w {
+            let c1 = img1.get_pixel(x1 + dx, y1 + dy);
+            let c2 = img2.get_pixel(x2 + dx, y2 + dy);
             let mut d2 = 0;
             for i in 0..4 {
                 d2 += (c1.0[i] as i32 - c2.0[i] as i32).pow(2);
@@ -552,6 +550,12 @@ pub fn image_distance(img1: &Image, img2: &Image) -> f64 {
     }
     res *= 0.005;
     res
+}
+
+pub fn image_distance(img1: &Image, img2: &Image) -> f64 {
+    assert_eq!(img1.width, img2.width);
+    assert_eq!(img1.height, img2.height);
+    image_slice_distance(img1, img2, 0, 0, 0, 0, img1.width, img1.height)
 }
 
 crate::entry_point!("render_moves_example", render_moves_example);

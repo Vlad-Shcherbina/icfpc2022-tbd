@@ -1,64 +1,36 @@
-use std::fs::File;
-use std::path::Path;
-use image::{imageops, Rgba, RgbaImage};
-use crate::image::Image;
-use crate::basic::{BlockId, Color, image_distance, Move, PainterState, Shape};
-use crate::basic::Move::PCut;
 use crate::util::project_path;
-use std::io::Write;
-
-crate::entry_point!("qtree", qtree);
-
-fn read_img(path: &Path) -> image::RgbaImage {
-    let img = image::open(path).unwrap();
-    img.to_rgba8()
-}
-
-fn crop(img: &RgbaImage, shape: Shape) -> RgbaImage {
-    let c = imageops::crop_imm(
-        img,
-        shape.x1 as u32,
-        (img.height() - shape.y2 as u32) as u32,
-        (shape.x2 - shape.x1) as u32,
-        (shape.y2 - shape.y1) as u32);
-    c.to_image()
-}
+use crate::image::Image;
+use crate::basic::{BlockId, Color, image_slice_distance, image_distance, Move, PainterState, Shape};
+use crate::basic::Move::PCut;
 
 struct State {
-    img: RgbaImage,
+    img: Image,
     painter_state: PainterState,
 }
 
 impl State {
-    fn new(img: RgbaImage) -> State {
-        let (width, height) = (img.width(), img.height());
+    fn new(img: Image) -> State {
+        let (width, height) = (img.width, img.height);
         State {
             img,
-            painter_state: PainterState::new(width as i32, height as i32),
+            painter_state: PainterState::new(width, height),
         }
     }
 
-    fn get_pixel(&self, x: u32, y: u32) -> &Rgba<u8> {
-        self.img.get_pixel(x, self.img.height() - y - 1)
-    }
-
     fn potential_gain(&self, painter_state: &PainterState, shape: Shape) -> i32 {
-        let img = painter_state.render().to_raw_image();
-        let cropped_actual = crop(&img, shape);
-        let cropped_actual = Image::from_raw_image(&cropped_actual);
-        let cropped_target = crop(&self.img, shape);
-        let cropped_target = Image::from_raw_image(&cropped_target);
-        // Sorry, these look like ugly and unnecessary conversions,
-        // but I'm in a middle of a big refactoring (RgbaImage -> Image),
-        // so doing what't easy to do.
+        let img = painter_state.render();
+        let x = shape.x1;
+        let y = shape.y1;
+        let w = shape.x2 - shape.x1;
+        let h = shape.y2 - shape.y1;
         let res =
-            image_distance(&cropped_target, &cropped_actual) as i32;
-        println!("COMPARE {} {} {} {} = {}", cropped_target.width, cropped_target.height, cropped_actual.width, cropped_actual.height, res);
+            image_slice_distance(&self.img, &img, x, y, x, y, w, h) as i32;
+        println!("COMPARE {} {} {} {} = {}", w, h, w, h, res);
         res
     }
 
     fn solve(&mut self) -> (Vec<Move>, i32) {
-        let shape = Shape {x1: 0, y1: 0, x2: self.img.width() as i32, y2: self.img.height() as i32 };
+        let shape = Shape {x1: 0, y1: 0, x2: self.img.width as i32, y2: self.img.height as i32 };
         let block = BlockId::root(0);
         self.qtree(shape, block)
     }
@@ -68,7 +40,7 @@ impl State {
         let mut pixels = 0;
         for x in shape.x1..shape.x2 {
             for y in shape.y1..shape.y2 {
-                let p = self.get_pixel(x as u32, y as u32);
+                let p = self.img.get_pixel(x, y);
                 r += p.0[0] as u32; g += p.0[1] as u32; b += p.0[2] as u32; a += p.0[3] as u32;
                 pixels += 1;
             }
@@ -146,31 +118,37 @@ impl State {
             (moves, cost)
         }
     }
-
 }
 
-fn qtree() {
-    let problem_id = 9;
-    let path = project_path(format!("data/problems/{}.png", problem_id));
-
-    let raw_img = read_img(&path);  // TODO: maybe get rid of image::RgbaImage altogether in favor of our Image
-    let img = Image::load(&path);
-
-    let mut painter_state = PainterState::new(img.width, img.height);
-    let mut state = State::new(raw_img);
-    let (moves, cost) = state.solve();
-    let mut out_file = File::create(project_path(format!("outputs/qtree{}.txt", problem_id))).unwrap();
-    for mv in moves {
-        painter_state.apply_move(&mv);
-        println!("{}", mv);
-        writeln!(out_file, "{}", mv).unwrap();
+crate::entry_point!("qtree_solver", qtree_solver);
+fn qtree_solver() {
+    let args: Vec<String> = std::env::args().skip(2).collect();
+    if args.len() != 1 {
+        println!("Usage: qtree_solver <problem id>");
+        std::process::exit(1);
     }
-    let res_img = painter_state.render();
-    let out_path = project_path(format!("outputs/qtree{}.png", problem_id));
-    let img_dist = image_distance(&img, &res_img);
-    println!("Distance cost: {}", img_dist);
-    println!("Program cost:  {}", painter_state.cost);
-    println!("Total cost:    {}", img_dist as u64 + painter_state.cost as u64);
-    println!("Total cost2:   {}", cost);
-    res_img.save(&out_path);
+    let problem_id: i32 = args[0].parse().unwrap();
+
+    let target = Image::load(&project_path(format!("data/problems/{}.png", problem_id)));
+
+    let mut painter = PainterState::new(target.width, target.height);
+    let mut state = State::new(target.clone());
+    let (moves, _cost) = state.solve();
+
+    for m in &moves {
+        eprintln!("{}", m);
+        painter.apply_move(m);
+    }
+
+    let img = painter.render();
+
+    eprintln!();
+    eprintln!("cost: {}", painter.cost);
+    let dist = image_distance(&img, &target);
+    eprintln!("distance to target: {}", dist);
+    eprintln!("final score: {}", dist.round() as i32 + painter.cost);
+
+    let output_path = format!("outputs/dummy_{}.png", problem_id);
+    img.save(&crate::util::project_path(&output_path));
+    eprintln!("saved to {}", output_path);
 }
