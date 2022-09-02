@@ -5,8 +5,12 @@
 <button id="back">←</button>
 <button id="forward">→</button>
 <button id="run" type="submit">Run</button><br>
+<input type="file" id="reference"></input><br>
 <span id="cost">Cost:</span><br>
+<span id="difference">Difference:</span><br>
 <span id="step">Current step:</span><br>
 <canvas id="canvas" width="400" height="400" style="transform:scaleY(-1);"></canvas>
+<canvas id="ref_canvas" width="400" height="400" style="transform:scaleY(-1);"></canvas>
+<canvas id="diff_canvas" width="400" height="400" style="transform:scaleY(-1);"></canvas>
 <script src="/js/interpreter.js" type="module"></script>
 {% endblock %}

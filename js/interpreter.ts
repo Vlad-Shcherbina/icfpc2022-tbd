@@ -31,7 +31,9 @@ const run = document.getElementById("run")!;
 const back = document.getElementById("back")!;
 const forward = document.getElementById("forward")!;
 const costSpan = document.getElementById("cost") as HTMLSpanElement;
+const diffSpan = document.getElementById("difference") as HTMLSpanElement;
 const stepSpan = document.getElementById("step") as HTMLSpanElement;
+const referenceFile = document.getElementById("reference") as HTMLInputElement;
 const parser = new Parser();
 
 function copyFrom(c: HTMLCanvasElement, sx: number, sy: number, sw: number, sh: number) {
@@ -225,6 +227,8 @@ run.addEventListener('click', () => {
     }
     render(blocks);
     costSpan.innerText = `Cost: ${cost}`;
+    diffSpan.innerText = `Difference: ${computeDifference()}`;
+    updateHash();
 });
 
 function selectCurrentCommand() {
@@ -260,3 +264,81 @@ forward.addEventListener('click', () => {
     selectCurrentCommand();
     stepSpan.innerText = `Current step: ${JSON.stringify(step.cmd)}; Step cost: ${step.cost}`;
 })
+
+referenceFile.addEventListener('input', async (evt: Event) => {
+    const target = evt.target! as HTMLInputElement
+    const file = target.files![0]
+    console.log(file)
+    const bitmap = await createImageBitmap(file);
+    const canvas = document.getElementById("ref_canvas") as HTMLCanvasElement;
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext("2d")!;
+    ctx.translate(0, bitmap.height);
+    ctx.scale(1, -1);
+    ctx.drawImage(bitmap, 0, 0);
+    updateHash();
+})
+
+type RGBA = {r: number, g: number, b: number, a: number};
+
+function sqr(x: number) {
+    return x*x;
+}
+
+function pixelDiff(p1: RGBA, p2: RGBA) {
+    const rDist = sqr(p1.r - p2.r);
+    const gDist = sqr(p1.g - p2.g);
+    const bDist = sqr(p1.b - p2.b);
+    const aDist = sqr(p1.a - p2.a);
+    return Math.sqrt(rDist + gDist + bDist + aDist);
+}
+
+function rgbaAt(i: number, img: ImageData): RGBA {
+    return {r: img.data.at(i)!, g: img.data.at(i+1)!, b: img.data.at(i+2)!, a: img.data.at(i+3)!}
+}
+
+function computeDifference() {
+    const ref_canvas = document.getElementById("ref_canvas") as HTMLCanvasElement;
+    const canvas = document.getElementById("canvas") as HTMLCanvasElement;
+    const diff_canvas = document.getElementById("diff_canvas") as HTMLCanvasElement;
+    const ctx = diff_canvas.getContext('2d')!;
+    // fill with red, show difference with alpha-channel
+    ctx.fillStyle = 'red';
+    ctx.fillRect(0,0,diff_canvas.width, diff_canvas.height);
+    const ref_image = ref_canvas.getContext('2d')!.getImageData(0, 0, ref_canvas.width, ref_canvas.height);
+    const image = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height);
+    const diff_image = diff_canvas.getContext('2d')!.getImageData(0, 0, diff_canvas.width, diff_canvas.height);
+    let diff = 0;
+    let alpha = 0.005;
+    for(let i = 0; i < image.data.length; i += 4) {
+        const p1 = rgbaAt(i, ref_image);
+        const p2 = rgbaAt(i, image);
+        const pxdiff = pixelDiff(p1, p2);
+        diff += pxdiff;
+        // sets the alpha channel
+        diff_image.data[i+3] = Math.round(pxdiff / 2);
+    }
+    ctx.putImageData(diff_image, 0, 0);
+    return Math.round(diff*alpha);
+}
+
+function updateHash() {
+    const ref_canvas = document.getElementById("ref_canvas") as HTMLCanvasElement;
+    const state = {
+        input: inputBox.value,
+        reference: ref_canvas.toDataURL(),
+    }
+    window.location.hash = btoa(JSON.stringify(state));
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    if(window.location.hash) {
+        const state = JSON.parse(atob(window.location.hash.slice(1)));
+        const ref_canvas = document.getElementById("ref_canvas") as HTMLCanvasElement;
+        const img = new Image;
+        img.onload = () => { ref_canvas.getContext('2d')!.drawImage(img, 0, 0); };
+        img.src = state.reference;
+        inputBox.value = state.input;
+    }
+});
