@@ -119,6 +119,9 @@ impl Shape {
     pub fn height(&self) -> i32 {
         self.y2 - self.y1
     }
+    pub fn size(&self) -> i32 {
+        self.width() * self.height()
+    }
 }
 
 struct Block {
@@ -160,6 +163,7 @@ pub struct PainterState {
     height: i32,
     next_id: usize,
     blocks: HashMap<Vec<usize>, Block>,
+    cost: i32,
 }
 
 impl PainterState {
@@ -175,10 +179,13 @@ impl PainterState {
             height,
             next_id: 1,
             blocks,
+            cost: 0,
         }
     }
 
     pub fn apply_move(&mut self, m: &Move) {
+        let base_cost;
+        let block_size;
         match m {
             PCut { block_id, x, y } => {
                 let x = *x;
@@ -227,7 +234,8 @@ impl PainterState {
                 new_block_id.push(3);
                 self.blocks.insert(new_block_id, new_block);
 
-                // TODO: cost
+                base_cost = 10;
+                block_size = block.shape.size();
             }
             LCut { block_id, orientation, line_number } => {
                 let line_number = *line_number;
@@ -279,13 +287,15 @@ impl PainterState {
                         new_block_id.push(1);
                         self.blocks.insert(new_block_id, new_block);
                     }
-                    // TODO: cost
                 }
+                base_cost = 7;
+                block_size = block.shape.size();
             }
             Move::Color { block_id, color } => {
                 let block = self.blocks.get_mut(block_id).unwrap();
                 block.pieces = vec![(block.shape.clone(), *color)];
-                // TODO: cost
+                base_cost = 5;
+                block_size = block.shape.size();
             }
             Swap { block_id1, block_id2 } => {
                 let mut block1 = self.blocks.remove(block_id1).unwrap();
@@ -310,9 +320,11 @@ impl PainterState {
                 }
                 std::mem::swap(&mut block1.shape, &mut block2.shape);
 
+                base_cost = 3;
+                block_size = block1.shape.size();
+
                 self.blocks.insert(block_id1.clone(), block1);
                 self.blocks.insert(block_id2.clone(), block2);
-                // TODO: cost
             }
             Merge { block_id1, block_id2 } => {
                 let block1 = self.blocks.remove(block_id1).unwrap();
@@ -335,11 +347,14 @@ impl PainterState {
                 };
                 new_block.pieces.extend(block2.pieces);
 
+                base_cost = 1;
+                block_size = new_block.shape.size();
+
                 self.blocks.insert(vec![self.next_id], new_block);
                 self.next_id += 1;
-                // TODO: cost
             }
         }
+        self.cost += (base_cost * self.width * self.height + (block_size + 1)/2) / block_size;
     }
 
     pub fn render(&self) -> image::RgbaImage {
@@ -380,6 +395,9 @@ fn render_moves_example() {
         eprintln!("{}", m);
         painter.apply_move(m);
     }
+    eprintln!();
+    eprintln!("cost: {}", painter.cost);
+
     let img = painter.render();
     let path = "outputs/render_moves_example.png";
     img.save(crate::util::project_path(path)).unwrap();
