@@ -84,7 +84,7 @@ pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: Respo
         let rows = raw_rows.into_iter().map(|row| {
             let id: i32 = row.get("id");
             let problem_id: i32 = row.get("problem_id");
-            let data: String = row.get("data");
+            // let data: String = row.get("data");
             let moves_cost: i64 = row.get("moves_cost");
             let image_distance: i64 = row.get("image_distance");
             let score: i64 = moves_cost + image_distance;
@@ -92,7 +92,7 @@ pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: Respo
             let solver_args: Json<Option<Vec<String>>> = row.get("solver_args");
             let invocation_id: i32 = row.get("invocation_id");
             let timestamp: DateTime = row.get("timestamp");
-            SolutionRow { id, problem_id, data, moves_cost, image_distance, score, solver_name, solver_args: solver_args.0, invocation_id, timestamp }
+            SolutionRow { id, problem_id, /* data, */ moves_cost, image_distance, score, solver_name, solver_args: solver_args.0, invocation_id, timestamp }
         }).collect();
         let s = SolutionsTemplate {opts, rows}.render().unwrap();
         return resp.code("200 OK").body(s);
@@ -104,7 +104,7 @@ pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: Respo
 struct SolutionRow {
     id: i32,
     problem_id: i32,
-    data: String,
+    //data: String,
     moves_cost: i64,
     image_distance: i64,
     score: i64,
@@ -139,7 +139,6 @@ struct SolutionsOpts {
         <td>{{ row.solver_name }}</td>
         <td>[ {% for arg in row.solver_args %} arg {% endfor %} ]</td>
         <td>{{ row.invocation_id }}</td>
-        <!-- {{ row.data }} -->
     </tr>
 {% endfor %}
 </table>
