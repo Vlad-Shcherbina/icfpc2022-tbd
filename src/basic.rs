@@ -414,21 +414,37 @@ impl PainterState {
     }
 }
 
+pub fn image_distance(img1: &image::RgbaImage, img2: &image::RgbaImage) -> f64 {
+    assert_eq!(img1.width(), img2.width());
+    assert_eq!(img1.height(), img2.height());
+    let mut res = 0.0f64;
+    for (x, y, pixel1) in img1.enumerate_pixels() {
+        let pixel2 = img2.get_pixel(x, y);
+        let mut d2 = 0;
+        for i in 0..4 {
+            d2 += (pixel1[i] as i32 - pixel2[i] as i32).pow(2);
+        }
+        res += (d2 as f64).sqrt();
+    }
+    res *= 0.05;
+    res
+}
+
 crate::entry_point!("render_moves_example", render_moves_example);
 fn render_moves_example() {
     let moves = vec![
+        Move::Color {
+            block_id: vec![0],
+            color: Color { r: 0, g: 0, b: 255, a: 255 },
+        },
         PCut {
             block_id: vec![0],
-            x: 200,
-            y: 200
+            x: 360,
+            y: 40
         },
         Move::Color {
-            block_id: vec![0, 0],
-            color: Color { r: 255, g: 0, b: 0, a: 255 },
-        },
-        Move::Color {
-            block_id: vec![0, 2],
-            color: Color { r: 0, g: 255, b: 0, a: 255 },
+            block_id: vec![0, 3],
+            color: Color { r: 128, g: 128, b: 128, a: 255 },
         },
     ];
     let mut painter = PainterState::new(400, 400);
@@ -440,6 +456,12 @@ fn render_moves_example() {
     eprintln!("cost: {}", painter.cost);
 
     let img = painter.render();
+
+    let target_path = "data/problems/1.png";
+    let target = image::open(crate::util::project_path(target_path)).unwrap().to_rgba8();
+    let dist = image_distance(&img, &target);
+    eprintln!("distance to {} is {}", target_path, dist);
+
     let path = "outputs/render_moves_example.png";
     img.save(crate::util::project_path(path)).unwrap();
     eprintln!();
