@@ -18,7 +18,7 @@ impl Color {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Orientation {
     Horizontal,
     Vertical,
@@ -51,7 +51,7 @@ impl std::fmt::Display for BlockId {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Move {
     PCut {
         block_id: BlockId,
@@ -78,6 +78,7 @@ pub enum Move {
 }
 
 use Move::*;
+use crate::basic::PainterStateAction::{AddBlock, ColorBlock, IncrementCost, IncrementNextId, RemoveBlock, SwapBlocks};
 
 impl std::fmt::Display for Move {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -331,6 +332,15 @@ impl Shape {
         }
 
     }
+
+    pub(crate) fn from_image(img: &Image) -> Shape {
+        Shape {
+            x1: 0,
+            y1: 0,
+            x2: img.width,
+            y2: img.height,
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -382,6 +392,15 @@ fn test_sub_block() {
     assert!(subblock == Block {shape: shape2.clone(), pieces: vec![(shape2.clone(), c.clone())]})
 }
 
+#[derive(Clone)]
+enum PainterStateAction {
+    RemoveBlock { block_id: BlockId, removed_value: Block },
+    AddBlock { block_id: BlockId },
+    IncrementNextId,
+    IncrementCost { added_cost: i32 },
+    ColorBlock { block_id: BlockId, old_block: Block },
+    SwapBlocks { block_id1: BlockId, block_id2: BlockId },
+}
 
 #[derive(Clone)]
 pub struct PainterState {
@@ -390,6 +409,7 @@ pub struct PainterState {
     next_id: usize,
     blocks: HashMap<BlockId, Block>,
     pub(crate) cost: i32,
+    history: Vec<Vec<PainterStateAction>>,
 }
 
 impl PainterState {
@@ -406,19 +426,54 @@ impl PainterState {
             next_id: 1,
             blocks,
             cost: 0,
+            history: vec![],
         }
+    }
+
+    pub fn rollback_move(&mut self) {
+        assert!(!self.history.is_empty());
+        let mut last_move_actions = self.history.pop().unwrap();
+        while let Some(action) = last_move_actions.pop() {
+            match action {
+                PainterStateAction::RemoveBlock { block_id, removed_value } => {
+                    self.blocks.insert(block_id, removed_value);
+                }
+                PainterStateAction::AddBlock { block_id } => {
+                    self.blocks.remove(&block_id).unwrap();
+                }
+                PainterStateAction::IncrementNextId => {
+                    self.next_id -= 1;
+                }
+                PainterStateAction::IncrementCost { added_cost } => {
+                    self.cost -= added_cost;
+                }
+                ColorBlock { block_id, old_block } => {
+                    self.blocks.insert(block_id, old_block);
+                }
+                SwapBlocks { block_id1, block_id2 } => {
+                    let mut block1 = self.blocks.remove(&block_id1).unwrap();
+                    let mut block2 = self.blocks.remove(&block_id2).unwrap();
+                    swap_blocks(&mut block1, &mut block2);
+                    self.blocks.insert(block_id1.clone(), block1);
+                    self.blocks.insert(block_id2.clone(), block2);
+                }
+            }
+        };
     }
 
     // Returns the cost of the applied move
     pub fn apply_move(&mut self, m: &Move) -> i32 {
         let base_cost;
         let block_size;
+        let mut actions = vec![];
         match m {
             PCut { block_id, x, y } => {
                 let block = self.blocks.remove(block_id).unwrap();
+                actions.push(RemoveBlock { block_id: block_id.clone(), removed_value: block.clone() });
                 for (i, ss) in block.shape.p_cut_subshapes(*x, *y).into_iter().enumerate() {
                     let new_block = block.sub_block(ss);
                     let new_block_id = block_id.child(i);
+                    actions.push(AddBlock {block_id: new_block_id.clone()});
                     self.blocks.insert(new_block_id, new_block);
                 }
                 base_cost = 10;
@@ -426,9 +481,11 @@ impl PainterState {
             }
             LCut { block_id, orientation, line_number } => {
                 let block = self.blocks.remove(block_id).unwrap();
+                actions.push(RemoveBlock { block_id: block_id.clone(), removed_value: block.clone() });
                 for (i, ss) in block.shape.l_cut_subshapes(*orientation, *line_number).into_iter().enumerate() {
                     let new_block = block.sub_block(ss);
                     let new_block_id = block_id.child(i);
+                    actions.push(AddBlock {block_id: new_block_id.clone()});
                     self.blocks.insert(new_block_id, new_block);
                 }
                 base_cost = 7;
@@ -436,6 +493,7 @@ impl PainterState {
             }
             Move::Color { block_id, color } => {
                 let block = self.blocks.get_mut(block_id).unwrap();
+                actions.push(ColorBlock { block_id: block_id.clone(), old_block: block.clone() });
                 block.pieces = vec![(block.shape, *color)];
                 base_cost = 5;
                 block_size = block.shape.size();
@@ -448,10 +506,13 @@ impl PainterState {
                 block_size = block1.shape.size();
                 self.blocks.insert(block_id1.clone(), block1);
                 self.blocks.insert(block_id2.clone(), block2);
+                actions.push(SwapBlocks { block_id1: block_id1.clone(), block_id2: block_id2.clone() })
             }
             Merge { block_id1, block_id2 } => {
                 let block1 = self.blocks.remove(block_id1).unwrap();
                 let block2 = self.blocks.remove(block_id2).unwrap();
+                actions.push(RemoveBlock { block_id: block_id1.clone(), removed_value: block1.clone() });
+                actions.push(RemoveBlock { block_id: block_id2.clone(), removed_value: block2.clone() });
                 let mut new_block = Block {
                     shape: merge_shapes(block1.shape, block2.shape),
                     pieces: block1.pieces,
@@ -461,12 +522,17 @@ impl PainterState {
                 base_cost = 1;
                 block_size = block1.shape.size().max(block2.shape.size());
 
-                self.blocks.insert(BlockId::root(self.next_id), new_block);
+                let new_block_id = BlockId::root(self.next_id);
+                actions.push(AddBlock { block_id: new_block_id.clone()});
+                actions.push(IncrementNextId);
+                self.blocks.insert(new_block_id, new_block);
                 self.next_id += 1;
             }
         }
         let extra_cost = (base_cost * self.width * self.height + (block_size + 1)/2) / block_size;
         self.cost += extra_cost;
+        actions.push(IncrementCost { added_cost: extra_cost });
+        self.history.push(actions);
         extra_cost
     }
 
