@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::fs::File;
 use std::path::PathBuf;
 use image::{Rgba, RgbaImage};
-use crate::basic::{block_id_to_string, Color, Move, PainterState, Shape};
+use crate::basic::{BlockId, Color, Move, PainterState, Shape};
 use crate::basic::Move::PCut;
 use crate::util::project_path;
 use std::io::Write;
@@ -32,7 +32,7 @@ impl State {
 
     fn solve(&mut self) {
         let shape = Shape {x1: 0, y1: 0, x2: self.img.width() as i32, y2: self.img.height() as i32 };
-        let block = vec![0];
+        let block = BlockId::root(0);
         self.qtree(shape, block)
     }
 
@@ -64,11 +64,11 @@ impl State {
         colors.len() == 1
     }
 
-    fn qtree(&mut self, shape: Shape, block_id: Vec<usize>) {
-        println!("In {} (aka block {})", shape, block_id_to_string(&block_id));
+    fn qtree(&mut self, shape: Shape, block_id: BlockId) {
+        println!("In {} (aka block {})", shape, block_id);
         if shape.height() < 20 || shape.width() < 20 || self.is_uniform_color(shape) {
             let color = self.average_color(shape);
-            println!("Coloring {} (aka block {}) to {}", shape, block_id_to_string(&block_id), color);
+            println!("Coloring {} (aka block {}) to {}", shape, block_id, color);
             self.moves.push(Move::Color {
                 block_id,
                 color
@@ -88,8 +88,7 @@ impl State {
             y: y_mid,
         });
         for (id, subshape) in subblocks {
-            let mut new_block_id = block_id.clone();
-            new_block_id.push(id);
+            let new_block_id = block_id.child(id);
             self.qtree(subshape, new_block_id)
         }
     }

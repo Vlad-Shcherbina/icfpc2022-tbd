@@ -19,37 +19,59 @@ pub enum Orientation {
 }
 use Orientation::*;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct BlockId(Vec<usize>);
+
+impl BlockId {
+    pub fn root(idx: usize) -> BlockId {
+        BlockId(vec![idx])
+    }
+    pub fn child(&self, idx: usize) -> BlockId {
+        let mut res = self.clone();
+        res.0.push(idx);
+        res
+    }
+}
+
+impl std::fmt::Display for BlockId {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        for (i, part) in self.0.iter().enumerate() {
+            if i > 0 {
+                write!(f, ".")?;
+            }
+            write!(f, "{}", part)?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Move {
     PCut {
-        block_id: Vec<usize>,
+        block_id: BlockId,
         x: i32,
         y: i32,
     },
     LCut {
-        block_id: Vec<usize>,
+        block_id: BlockId,
         orientation: Orientation,
         line_number: i32,
     },
     Color {
-        block_id: Vec<usize>,
+        block_id: BlockId,
         color: Color,
     },
     Swap {
-        block_id1: Vec<usize>,
-        block_id2: Vec<usize>,
+        block_id1: BlockId,
+        block_id2: BlockId,
     },
     Merge {
-        block_id1: Vec<usize>,
-        block_id2: Vec<usize>,
+        block_id1: BlockId,
+        block_id2: BlockId,
     },
 }
 
 use Move::*;
-
-pub fn block_id_to_string(parts: &[usize]) -> String {
-    parts.iter().map(|p| p.to_string()).collect::<Vec<String>>().join(".")
-}
 
 impl std::fmt::Display for Move {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -58,7 +80,7 @@ impl std::fmt::Display for Move {
                 block_id,
                 x,
                 y,
-            } => write!(f, "cut [{}] [{}, {}]", block_id_to_string(block_id), x, y),
+            } => write!(f, "cut [{}] [{}, {}]", block_id, x, y),
             LCut {
                 block_id,
                 orientation,
@@ -68,20 +90,20 @@ impl std::fmt::Display for Move {
                     Orientation::Horizontal => "y",
                     Orientation::Vertical => "x",
                 };
-                write!(f, "cut [{}] [{}] [{}]", block_id_to_string(block_id), o, line_number)
+                write!(f, "cut [{}] [{}] [{}]", block_id, o, line_number)
             },
             Move::Color {
                 block_id,
                 color,
-            } => write!(f, "color [{}] [{}, {}, {}, {}]", block_id_to_string(block_id), color.r, color.g, color.b, color.a),
+            } => write!(f, "color [{}] [{}, {}, {}, {}]", block_id, color.r, color.g, color.b, color.a),
             Swap {
                 block_id1,
                 block_id2,
-            } => write!(f, "swap [{}] [{}]", block_id_to_string(block_id1), block_id_to_string(block_id2)),
+            } => write!(f, "swap [{}] [{}]", block_id1, block_id2),
             Merge {
                 block_id1,
                 block_id2,
-            } => write!(f, "merge [{}] [{}]", block_id_to_string(block_id1), block_id_to_string(block_id2)),
+            } => write!(f, "merge [{}] [{}]", block_id1, block_id2),
         }
     }
 }
@@ -158,11 +180,11 @@ impl Move {
     }
 }
 
-fn strip_block_id(s: &str) -> (Vec<usize>, &str) {
+fn strip_block_id(s: &str) -> (BlockId, &str) {
     let s = s.strip_prefix('[').unwrap();
     let (block_id, s) = s.split_once(']').unwrap();
     let block_id = block_id.split('.').map(|p| p.parse().unwrap()).collect();
-    (block_id, s)
+    (BlockId(block_id), s)
 }
 
 fn roundtrip(s: &str) {
@@ -185,9 +207,9 @@ fn test_string_to_move_and_back() {
 #[test]
 fn test_move_to_string() {
     let moves = vec![
-        Move::Color { block_id: vec![0], color: Color { r: 146, g: 149, b: 120, a: 223 } },
-        Move::LCut { block_id: vec![0], orientation: Horizontal, line_number: 160 },
-        Move::Color { block_id: vec![0, 1], color: Color { r: 1, g: 2, b: 3, a: 4 } },
+        Move::Color { block_id: BlockId::root(0), color: Color { r: 146, g: 149, b: 120, a: 223 } },
+        Move::LCut { block_id: BlockId::root(0), orientation: Horizontal, line_number: 160 },
+        Move::Color { block_id: BlockId::root(0).child(1), color: Color { r: 1, g: 2, b: 3, a: 4 } },
     ];
 
     let mut res = String::new();
@@ -359,7 +381,7 @@ pub struct PainterState {
     width: i32,
     height: i32,
     next_id: usize,
-    blocks: HashMap<Vec<usize>, Block>,
+    blocks: HashMap<BlockId, Block>,
     pub cost: i32,
 }
 
@@ -367,7 +389,7 @@ impl PainterState {
     pub fn new(width: i32, height: i32) -> Self {
         let mut blocks = HashMap::new();
         let shape = Shape { x1: 0, y1: 0, x2: width, y2: height };
-        blocks.insert(vec![0], Block {
+        blocks.insert(BlockId::root(0), Block {
             shape,
             pieces: vec![(shape, Color { r: 0, g: 0, b: 0, a: 0 })],
         });
@@ -388,8 +410,7 @@ impl PainterState {
                 let block = self.blocks.remove(block_id).unwrap();
                 for (i, ss) in block.shape.p_cut_subshapes(*x, *y).into_iter().enumerate() {
                     let new_block = block.sub_block(ss);
-                    let mut new_block_id = block_id.clone();
-                    new_block_id.push(i);
+                    let new_block_id = block_id.child(i);
                     self.blocks.insert(new_block_id, new_block);
                 }
                 base_cost = 10;
@@ -399,8 +420,7 @@ impl PainterState {
                 let block = self.blocks.remove(block_id).unwrap();
                 for (i, ss) in block.shape.l_cut_subshapes(*orientation, *line_number).into_iter().enumerate() {
                     let new_block = block.sub_block(ss);
-                    let mut new_block_id = block_id.clone();
-                    new_block_id.push(i);
+                    let new_block_id = block_id.child(i);
                     self.blocks.insert(new_block_id, new_block);
                 }
                 base_cost = 7;
@@ -433,7 +453,7 @@ impl PainterState {
                 base_cost = 1;
                 block_size = new_block.shape.size();
 
-                self.blocks.insert(vec![self.next_id], new_block);
+                self.blocks.insert(BlockId::root(self.next_id), new_block);
                 self.next_id += 1;
             }
         }
@@ -536,16 +556,16 @@ crate::entry_point!("render_moves_example", render_moves_example);
 fn render_moves_example() {
     let moves = vec![
         Move::Color {
-            block_id: vec![0],
+            block_id: BlockId::root(0),
             color: Color { r: 0, g: 74, b: 173, a: 255 },
         },
         PCut {
-            block_id: vec![0],
+            block_id: BlockId::root(0),
             x: 360,
             y: 40
         },
         Move::Color {
-            block_id: vec![0, 3],
+            block_id: BlockId::root(0).child(3),
             color: Color { r: 128, g: 128, b: 128, a: 255 },
         },
     ];
@@ -576,11 +596,11 @@ fn render_moves_example() {
 fn test_split_merge() {
     let mut painter = PainterState::new(100, 100);
     painter.apply_move(&LCut {
-        block_id: vec![0],
+        block_id: BlockId(vec![0]),
         orientation: Orientation::Horizontal,
         line_number: 50,
     });
-    painter.apply_move(&Merge { block_id1: vec![0, 0], block_id2: vec![0, 1] })
+    painter.apply_move(&Merge { block_id1: BlockId::root(0).child(0), block_id2: BlockId::root(0).child(1) })
 }
 
 

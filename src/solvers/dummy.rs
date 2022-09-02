@@ -28,7 +28,7 @@ fn dummy_solver() {
 
     let moves = vec![
         Move::Color {
-            block_id: vec![0],
+            block_id: BlockId::root(0),
             color,
         }
     ];
