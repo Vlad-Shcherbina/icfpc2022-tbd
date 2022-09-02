@@ -9,6 +9,7 @@ pub mod basic;
 mod solvers;
 mod image;
 mod uploader;
+mod solver_utils;
 
 crate::entry_point!("hello", hello);
 fn hello() {

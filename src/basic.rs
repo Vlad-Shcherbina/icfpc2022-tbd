@@ -5,8 +5,18 @@ use std::collections::HashMap;
 use std::fmt::{Formatter, Write};
 use crate::image::Image;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
 pub struct Color(pub [u8; 4]);
+
+impl Color {
+    pub fn dist(&self, other: &Color) -> f64 {
+        let mut d = 0;
+        for i in 0..4 {
+            d += (self.0[i] as i32 - other.0[i] as i32).pow(2);
+        }
+        return (d as f64).sqrt(); 
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum Orientation {
@@ -537,15 +547,9 @@ fn swap_blocks(block1: &mut Block, block2: &mut Block) {
 
 pub fn image_slice_distance(img1: &Image, img2: &Image , x1: i32, y1: i32, x2: i32, y2: i32, w: i32, h: i32) -> f64 {
     let mut res = 0.0f64;
-    for dy in 0..h {
-        for dx in 0..w {
-            let c1 = img1.get_pixel(x1 + dx, y1 + dy);
-            let c2 = img2.get_pixel(x2 + dx, y2 + dy);
-            let mut d2 = 0;
-            for i in 0..4 {
-                d2 += (c1.0[i] as i32 - c2.0[i] as i32).pow(2);
-            }
-            res += (d2 as f64).sqrt();
+    for y in 0..img1.height {
+        for x in 0..img1.width {
+            res += img1.get_pixel(x, y).dist(&img2.get_pixel(x, y));
         }
     }
     res *= 0.005;
