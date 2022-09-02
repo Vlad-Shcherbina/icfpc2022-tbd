@@ -4,10 +4,53 @@ use crate::basic::{BlockId, Color, image_slice_distance, image_distance, Move, P
 use crate::basic::Move::PCut;
 use crate::invocation::{record_this_invocation, Status};
 use crate::uploader::upload_solution;
+use rstats::{VecVec};
 
 struct State {
     img: Image,
     painter_state: PainterState,
+}
+
+fn mean(img: &Image, shape: Shape) -> Color {
+    let (mut r, mut g, mut b, mut a) = (0u32, 0u32, 0u32, 0u32);
+    let mut pixels = 0;
+    for x in shape.x1..shape.x2 {
+        for y in shape.y1..shape.y2 {
+            let p = img.get_pixel(x, y);
+            r += p.0[0] as u32; g += p.0[1] as u32; b += p.0[2] as u32; a += p.0[3] as u32;
+            pixels += 1;
+        }
+    }
+    Color([
+        (r / pixels) as u8,
+        (g / pixels) as u8,
+        (b / pixels) as u8,
+        (a / pixels) as u8,
+    ])
+}
+
+fn geometric_median(img: &Image, shape: Shape) -> Color {
+    // Can this be done with a slice?
+    let mut colors = vec![];
+    for y in shape.y1..shape.y2 {
+        for x in shape.x1..shape.x2 {
+            colors.push(Vec::from(img.get_pixel(x, y).0));
+        }
+    }
+    let median = colors.gmedian(0.5);
+    //dbg!(median.clone());
+    for i in 0..3 {
+        if median[i].is_nan() {
+            // Fallback to mean. I've no idea why the median algorithm fails sometimes.
+            return mean(img,shape);
+        }
+    }
+    Color {0: [
+        median[0].round() as u8,
+        median[1].round() as u8,
+        median[2].round() as u8,
+        median[3].round() as u8,
+    ]}
 }
 
 impl State {
@@ -36,21 +79,8 @@ impl State {
     }
 
     fn average_color(&self, shape: Shape) -> Color {
-        let (mut r, mut g, mut b, mut a) = (0u32, 0u32, 0u32, 0u32);
-        let mut pixels = 0;
-        for x in shape.x1..shape.x2 {
-            for y in shape.y1..shape.y2 {
-                let p = self.img.get_pixel(x, y);
-                r += p.0[0] as u32; g += p.0[1] as u32; b += p.0[2] as u32; a += p.0[3] as u32;
-                pixels += 1;
-            }
-        }
-        Color([
-            (r / pixels) as u8,
-            (g / pixels) as u8,
-            (b / pixels) as u8,
-            (a / pixels) as u8,
-        ])
+        return geometric_median(&self.img, shape);
+        //return mean(&self.img, shape);
     }
 
     fn qtree_stop_here_recolor_cost(&self, shape: Shape, block_id: BlockId) -> i32 {
