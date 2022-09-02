@@ -4,6 +4,7 @@ mod util;
 mod dashboard;
 mod db;
 mod invocation;
+mod print_invocations;
 pub mod basic;
 mod qtree;
 

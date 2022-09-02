@@ -1,6 +1,8 @@
-use std::path::{Path, Component};
+use std::{path::{Path, Component}};
 use postgres::{Client, Transaction, types::Json};
 use once_cell::sync::{Lazy, OnceCell};
+
+use crate::util::{DateTime};
 
 crate::entry_point!("invocation_demo", invocation_demo);
 fn invocation_demo() {
@@ -47,6 +49,20 @@ pub enum Status {
     Stopped,
 }
 
+#[derive(Debug)]
+pub struct Snapshot {
+    pub sql_id: i32,
+    pub status: RecordedStatus,
+    pub invocation: Invocation,
+}
+
+#[derive(Debug)]
+pub enum RecordedStatus {
+    Running { start: DateTime, upcoming: DateTime },
+    Stopped { start: DateTime, finish: DateTime },
+    Lost { start: DateTime, lost: DateTime },
+}
+
 /// Creates or updates current invocation.
 /// Returns invocation ID, it will be the same if called mutliple times.
 pub fn record_this_invocation(t: &mut Transaction, status: Status) -> i32 {
@@ -74,6 +90,29 @@ pub fn record_this_invocation(t: &mut Transaction, status: Status) -> i32 {
         ", &[&status, &delta_time, &Json(&*THIS_INVOCATION), &id]).unwrap();
     }
     id
+}
+
+pub fn get_invocations(client: &mut Client) -> Vec<Snapshot> {
+    let _do = create_table(client); // update VIEW with the latest LOST entries
+    let v = client.query("SELECT id, status, start_time, update_time, data FROM invocations", &[]).unwrap();
+    return v.iter().map(|row| {
+        let sql_id: i32 = row.get(0);
+        let raw_status: &str = row.get(1);
+        println!("{}", raw_status);
+        let t_0: DateTime = row.get(2);
+        let t_u: DateTime = row.get(3);
+        let invocation: Json<Invocation> = row.get(4);
+        let status = match raw_status {
+            "RUN" => RecordedStatus::Running { start: t_0, upcoming: t_u },
+            "STOPPED" => RecordedStatus::Stopped { start: t_0, finish: t_u },
+            _ => RecordedStatus::Lost { start: t_0, lost: t_u }
+        };
+        return Snapshot{
+            sql_id,
+            status,
+            invocation: invocation.0,
+        }
+    }).collect();
 }
 
 pub fn create_table(client: &mut Client) {
