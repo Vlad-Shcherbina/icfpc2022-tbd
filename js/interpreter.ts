@@ -36,6 +36,8 @@ const diffSpan = document.getElementById("difference") as HTMLSpanElement;
 const stepSpan = document.getElementById("step") as HTMLSpanElement;
 const referenceFile = document.getElementById("reference") as HTMLInputElement;
 const referenceSelector = document.getElementById("reference_select") as HTMLInputElement;
+const overlayToggle = document.getElementById("toggle_overlay") as HTMLInputElement;
+const heatmapColor = document.getElementById("heatmap_color")! as HTMLInputElement;
 const parser = new Parser();
 
 function copyFrom(c: HTMLCanvasElement, sx: number, sy: number, sw: number, sh: number) {
@@ -306,8 +308,8 @@ function computeDifference() {
     const canvas = document.getElementById("canvas") as HTMLCanvasElement;
     const diff_canvas = document.getElementById("diff_canvas") as HTMLCanvasElement;
     const ctx = diff_canvas.getContext('2d')!;
-    // fill with red, show difference with alpha-channel
-    ctx.fillStyle = 'red';
+    // fill with solid color, show difference with alpha-channel
+    ctx.fillStyle = heatmapColor.value;
     ctx.fillRect(0,0,diff_canvas.width, diff_canvas.height);
     const ref_image = ref_canvas.getContext('2d')!.getImageData(0, 0, ref_canvas.width, ref_canvas.height);
     const image = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height);
@@ -320,6 +322,7 @@ function computeDifference() {
         const pxdiff = pixelDiff(p1, p2);
         diff += pxdiff;
         // sets the alpha channel
+        // max pxdiff is sqrt(4*255**2) = 2*255 => max alpha value is half max pxdiff.
         diff_image.data[i+3] = Math.round(pxdiff / 2);
     }
     ctx.putImageData(diff_image, 0, 0);
@@ -330,6 +333,8 @@ function updateHash() {
     const state = {
         input: inputBox.value,
         reference: referenceSelector.value,
+        overlay: overlayToggle.checked,
+        heatmapColor: heatmapColor.value,
     }
     window.location.hash = btoa(JSON.stringify(state));
 }
@@ -347,6 +352,19 @@ function loadReferenceImage() {
     }
 }
 
+function updateOverlayStyle() {
+    const ref_canvas = document.getElementById("ref_canvas") as HTMLCanvasElement;
+    const diff_canvas = document.getElementById("diff_canvas") as HTMLCanvasElement;
+    if (overlayToggle.checked) {
+        ref_canvas.style.position = 'absolute';
+        diff_canvas.style.position = 'absolute';
+    } else {
+        ref_canvas.style.position = 'relative';
+        diff_canvas.style.position = 'relative';
+    }
+    updateHash();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     referenceSelector.addEventListener('change', () => {
         loadReferenceImage();
@@ -357,10 +375,14 @@ document.addEventListener('DOMContentLoaded', () => {
         option.innerText = option.value;
         referenceSelector.appendChild(option);
     }
+    overlayToggle.addEventListener('change', updateOverlayStyle)
     if(window.location.hash) {
         const state = JSON.parse(atob(window.location.hash.slice(1)));
         inputBox.value = state.input;
         referenceSelector.value = state.reference;
+        overlayToggle.checked = state.overlay;
+        heatmapColor.value = state.heatmapColor || "#ff0000";
+        updateOverlayStyle();
     }
     loadReferenceImage();
 });
