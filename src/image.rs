@@ -1,5 +1,6 @@
 use crate::basic::Color;
 
+#[derive(Clone)]
 pub struct Image {
     pub width: i32,
     pub height: i32,
