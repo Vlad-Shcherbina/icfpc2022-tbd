@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::fmt::{Formatter, Write};
 use crate::image::Image;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash, PartialOrd, Ord)]
 pub struct Color(pub [u8; 4]);
 
 impl Color {
@@ -426,6 +426,11 @@ pub struct PainterState {
     history: Vec<Vec<PainterStateAction>>,
 }
 
+pub struct ApplyMoveResult {
+    pub cost: i64,
+    pub new_block_ids: Vec<BlockId>,  // new block IDs for "cut" and "merge" moves
+}
+
 impl PainterState {
     pub fn new(width: i32, height: i32) -> Self {
         let mut blocks = HashMap::new();
@@ -476,7 +481,8 @@ impl PainterState {
     }
 
     // Returns the cost of the applied move
-    pub fn apply_move(&mut self, m: &Move) -> i64 {
+    pub fn apply_move(&mut self, m: &Move) -> ApplyMoveResult {
+        let mut new_block_ids = vec![];
         let base_cost;
         let block_size;
         let mut actions = vec![];
@@ -488,6 +494,7 @@ impl PainterState {
                     let new_block = block.sub_block(ss);
                     let new_block_id = block_id.child(i);
                     actions.push(AddBlock {block_id: new_block_id.clone()});
+                    new_block_ids.push(new_block_id.clone());
                     self.blocks.insert(new_block_id, new_block);
                 }
                 base_cost = 10;
@@ -500,6 +507,7 @@ impl PainterState {
                     let new_block = block.sub_block(ss);
                     let new_block_id = block_id.child(i);
                     actions.push(AddBlock {block_id: new_block_id.clone()});
+                    new_block_ids.push(new_block_id.clone());
                     self.blocks.insert(new_block_id, new_block);
                 }
                 base_cost = 7;
@@ -537,6 +545,7 @@ impl PainterState {
                 block_size = block1.shape.size().max(block2.shape.size());
 
                 let new_block_id = BlockId::root(self.next_id);
+                new_block_ids.push(new_block_id.clone());
                 actions.push(AddBlock { block_id: new_block_id.clone()});
                 actions.push(IncrementNextId);
                 self.blocks.insert(new_block_id, new_block);
@@ -547,7 +556,10 @@ impl PainterState {
         self.cost += extra_cost;
         actions.push(IncrementCost { added_cost: extra_cost });
         self.history.push(actions);
-        extra_cost
+        ApplyMoveResult {
+            cost: extra_cost,
+            new_block_ids,
+        }
     }
 
     pub fn render(&self) -> Image {
@@ -574,7 +586,7 @@ fn merge_shapes(shape1: Shape, shape2: Shape) -> Shape {
             x2: shape2.x2,
             y2: shape2.y2,
         }
-    } else if shape2.x1 == shape1.x2 && shape1.y1 == shape2.y1 && shape1.y2 == shape2.y2 {
+    } else if shape2.x2 == shape1.x1 && shape1.y1 == shape2.y1 && shape1.y2 == shape2.y2 {
         // 2 to the left of 1
         Shape {
             x1: shape2.x1,

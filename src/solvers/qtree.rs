@@ -83,7 +83,7 @@ impl State {
         let extra_cost = state_copy.apply_move(&Move::ColorMove {
             block_id,
             color: self.average_color(shape),
-        });
+        }).cost;
         extra_cost + self.potential_gain(&state_copy, shape)
     }
 
@@ -97,7 +97,7 @@ impl State {
             block_id,
             x: (shape.x1 + shape.x2) / 2,
             y: (shape.y1 + shape.y2) / 2,
-        })
+        }).cost
     }
 
     fn qtree(&mut self, shape: Shape, block_id: BlockId) -> (Vec<Move>, i64) {
