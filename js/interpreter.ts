@@ -195,8 +195,8 @@ run.addEventListener('click', () => {
                 this_step_cost = cost_est(blk.c);
                 cmd.point[0] -= blk.x;
                 cmd.point[1] -= blk.y;
-                if (cmd.point[0] == 0 || cmd.point[0] >= blk.c.width) throw new Error('Point is on block border in x dimension');
-                if (cmd.point[1] == 0 || cmd.point[1] >= blk.c.height) throw new Error('Point is on block border in y dimension');
+                if (cmd.point[0] <= 0 || cmd.point[0] >= blk.c.width) throw new Error('Point is on block border in x dimension');
+                if (cmd.point[1] <= 0 || cmd.point[1] >= blk.c.height) throw new Error('Point is on block border in y dimension');
                 blocks.delete(cmd.block);
                 blocks.set(`${cmd.block}.0`, { x: blk.x, y: blk.y, c: copyFrom(blk.c, 0, 0, cmd.point[0], cmd.point[1]) });
                 blocks.set(`${cmd.block}.1`, { x: blk.x + cmd.point[0], y: blk.y,
@@ -217,7 +217,7 @@ run.addEventListener('click', () => {
                 } else if (cmd.dir === "y") {
                     cmd.num -= blk.y;
                 }
-                if (cmd.num === 0 || cmd.num >= blksize) throw new Error(`Point is on block border in ${cmd.dir} dimension`);
+                if (cmd.num <= 0 || cmd.num >= blksize) throw new Error(`Point is on block border in ${cmd.dir} dimension`);
                 blocks.delete(cmd.block);
                 if (cmd.dir === "x") {
                     blocks.set(`${cmd.block}.0`, { x: blk.x, y: blk.y,
@@ -272,7 +272,12 @@ run.addEventListener('click', () => {
                 // we use minimal cost of the two.
                 this_step_cost = Math.min(cost_est(blk1.c), cost_est(blk2.c));
                 if (blk1.x === blk2.x) {
-                    if (blk1.c.width !== blk2.c.width) throw new Error("Blocks are not compatible for merge: width differs");
+                    if (blk1.c.width !== blk2.c.width) {
+                        throw new Error(`Blocks ${cmd.block1} and ${cmd.block2} are not compatible for merge: width differs`);
+                    }
+                    if (blk2.y - blk1.y !== blk1.c.height && blk1.y-blk2.y !== blk2.c.height) {
+                        throw new Error(`Blocks ${cmd.block1} and ${cmd.block2} are not adjacent`);
+                    }
                     const minY = Math.min(blk1.y, blk2.y);
                     const oldX = blk1.x;
                     blk1.y -= minY;
@@ -280,7 +285,12 @@ run.addEventListener('click', () => {
                     blk1.x = blk2.x = 0;
                     mergeBlocks(oldX, minY, blk1.c.width, blk1.c.height + blk2.c.height, blk1, blk2);
                 } else if (blk1.y === blk2.y) {
-                    if (blk1.c.height !== blk2.c.height) throw new Error("Blocks are not compatible for merge: height differs");
+                    if (blk1.c.height !== blk2.c.height) {
+                        throw new Error(`Blocks ${cmd.block1} and ${cmd.block2} are not compatible for merge: height differs`);
+                    }
+                    if (blk2.x - blk1.x !== blk1.c.width && blk1.x-blk2.x !== blk2.c.width) {
+                        throw new Error(`Blocks ${cmd.block1} and ${cmd.block2} are not adjacent`);
+                    }
                     const minX = Math.min(blk1.x, blk2.x);
                     const oldY = blk1.y;
                     blk1.x -= minX;
