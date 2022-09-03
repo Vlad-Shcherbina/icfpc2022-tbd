@@ -94,19 +94,29 @@ struct State {
     items: Vec<(bool, Shape)>,
     plan: Vec<(usize, usize)>,
     best_plan: Option<Vec<(usize, usize)>>,
+    best_cost: i64,
+    cost: i64,
+    canvas_size: i32,
 }
 
-fn plan_merge_all(shapes: &[Shape]) -> Vec<(usize, usize)> {
+fn plan_merge_all(canvas_size: i32, shapes: &[Shape]) -> Vec<(usize, usize)> {
     // TODO: choose best cost
     let mut state = State {
         cnt: shapes.len(),
         items: shapes.iter().map(|&s| (true, s)).collect(),
         plan: vec![],
         best_plan: None,
+        best_cost: 1_000_000_000,
+        cost: 0,
+        canvas_size,
     };
     fn rec(state: &mut State) {
         if state.cnt == 1 {
-            state.best_plan = Some(state.plan.clone());
+            if state.cost < state.best_cost {
+                state.best_cost = state.cost;
+                state.best_plan = Some(state.plan.clone());
+            }
+            // state.best_plan = Some(state.plan.clone());
             return;
         }
 
@@ -120,12 +130,17 @@ fn plan_merge_all(shapes: &[Shape]) -> Vec<(usize, usize)> {
                 }
                 let merged = merge_shapes(state.items[i].1, state.items[j].1);
                 if let Some(merged) = merged {
+                    let dcost = (state.canvas_size + (merged.size() + 1) / 2) / merged.size();
+                    let dcost = dcost as i64;
+
                     state.items[i].0 = false;
                     state.items[j].0 = false;
                     state.items.push((true, merged));
                     state.plan.push((i, j));
                     state.cnt -= 1;
+                    state.cost += dcost;
                     rec(state);
+                    state.cost -= dcost;
                     state.cnt += 1;
                     state.plan.pop();
                     state.items.pop();
@@ -146,7 +161,7 @@ pub fn merge_all(p: &mut PainterState) -> (BlockId, Vec<Move>) {
         shapes.push(block.shape);
         ids.push(id.clone());
     }
-    let plan = plan_merge_all(&shapes);
+    let plan = plan_merge_all(400 * 400, &shapes);  // TODO: don't hardcode canvas size
     let mut moves = vec![];
     for (i, j) in plan {
         let m = Merge {
