@@ -34,7 +34,7 @@ fn init_tables() {
         timestamp TIMESTAMP WITH TIME ZONE NOT NULL
     );
 
-    -- Insert into good_submissions when the API returns a SUCEEDED in the status field
+    -- Insert into good_submissions when the API returns a SUCCEEDED in the status field
     CREATE TABLE IF NOT EXISTS good_submissions(
 
         submission_id INTEGER PRIMARY KEY REFERENCES submissions(submission_id),

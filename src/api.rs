@@ -62,7 +62,10 @@ pub fn submit_solution(client: &mut Client, solution_id: i32) -> i32 {
 
     let r = with_auth(
         ureq::post(&url(&conf, &((conf.problems)(s.problem_id)))).
-            set("Content-Type", &format!("multipart/form-data; boundary={}", mdata.boundary())),
+            set(
+                "Content-Type",
+                &format!("multipart/form-data; boundary={}", mdata.boundary())
+            ),
         &conf
     );
     let y: SubmissionOk = r.send(mdata).unwrap().into_json().unwrap();
@@ -84,8 +87,9 @@ pub fn check_submission(client: &mut Client, submission_id: i32) -> SubmissionSt
     let y: SubmissionStatus = r.call().unwrap().into_json().unwrap();
     let error = y.error.clone();
     let file_url = y.file_url.clone();
-    match y.cost {
-        None =>
+    let cost = y.cost;
+    match y.status.as_str() {
+        "FAILED" =>
             client.query_opt("
             INSERT INTO bad_submissions(submission_id, error, file_url, timestamp)
             VALUES ($1, $2, $3, NOW())
@@ -95,16 +99,17 @@ pub fn check_submission(client: &mut Client, submission_id: i32) -> SubmissionSt
                 &error.unwrap_or_else( || "no error returned".into()),
                 &file_url]
             ).unwrap(),
-        Some(cost) =>
+        "SUCCEEDED" =>
             client.query_opt("
             INSERT INTO good_submissions(submission_id, cost, file_url, timestamp)
             VALUES ($1, $2, $3, NOW())
             ON CONFLICT (submission_id) DO NOTHING
             ", &[
                 &submission_id,
-                &cost,
+                &cost.unwrap(),
                 &y.file_url]
-            ).unwrap()
+            ).unwrap(),
+        _otherwise => None
     };
     y
 }
@@ -126,13 +131,16 @@ crate::entry_point!("api_demo", api_demo);
 fn api_demo() {
     let mut client = crate::db::create_client();
 
-    let sid = submit_best_solution(&mut client, 23);
+    let sid = submit_best_solution(&mut client, 27);
     std::thread::sleep(std::time::Duration::from_secs(20));
     println!("{:#?}", check_submission(&mut client, sid));
-    client.query("SELECT * FROM good_submissions", &[]).unwrap().into_iter().for_each(|row| {
-        let submission_id: i32 = row.get("submission_id");
-        let cost: i64 = row.get("cost");
-        let timestamp: DateTime = row.get("timestamp");
-        println!("* * *\n({:?}) : {:?} @ {:?}", submission_id, cost, timestamp);
-    });
+    client.query("SELECT * FROM good_submissions", &[])
+        .unwrap()
+        .into_iter()
+        .for_each(|row| {
+            let submission_id: i32 = row.get("submission_id");
+            let cost: i64 = row.get("cost");
+            let timestamp: DateTime = row.get("timestamp");
+            println!("* * *\n({:?}) : {:?} @ {:?}", submission_id, cost, timestamp);
+        });
 }
