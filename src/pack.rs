@@ -65,6 +65,7 @@ struct State {
     cnts: Vec<(Color, i32)>,
     solution: Option<Vec<(Shape, Color)>>,
     best_cost: i32,
+    cost: i32,
 }
 
 fn rec(i: usize, state: &mut State) {
@@ -117,14 +118,19 @@ fn rec(i: usize, state: &mut State) {
                     // eprintln!("  {}{:?}", "  ".repeat(i as usize), (x1, y1, w, h));
 
                     let old_img = state.img.clone();
+                    let old_cost = state.cost;
 
                     for y in y1..y1 + h {
                         for x in x1..x1 + w {
                             if state.img.get_pixel(x, y) == state.nac {
                                 state.img.set_pixel(x, y, state.cnts[i].0);
+                                if state.target.get_pixel(x, y) != state.cnts[i].0 {
+                                    state.cost += 1;
+                                }
                             }
                         }
                     }
+
                     state.rects.push((Shape {
                         x1,
                         y1,
@@ -132,10 +138,13 @@ fn rec(i: usize, state: &mut State) {
                         y2: y1 + h,
                     }, state.cnts[i].0));
 
-                    rec(i + 1, state);
+                    if state.cost < state.best_cost {
+                        rec(i + 1, state);
+                    }
 
                     state.rects.pop().unwrap();
                     state.img = old_img;
+                    state.cost = old_cost;
                 }
             }
         }
@@ -165,6 +174,7 @@ pub fn packing2(target: &Image) -> Vec<(Shape, Color)> {
         cnts,
         solution: None,
         best_cost: i32::MAX,
+        cost: 0,
     };
     rec(0, &mut state);
 

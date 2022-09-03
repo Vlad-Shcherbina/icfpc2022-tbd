@@ -41,7 +41,7 @@ fn swan_solver() {
 
 
     let mut argss = vec![];
-    for num_colors in 2..=4 {
+    for num_colors in 2..=5 {
         for px in [40, 50, 80] {
             for py in [40, 50, 80] {
                 argss.push(SolverArgs { px, py, num_colors });
@@ -69,8 +69,8 @@ fn swan_solver() {
         } else {
             tx.commit().unwrap();
         }
+        eprintln!("{}", crate::stats::STATS.render());
     }
-    eprintln!("{}", crate::stats::STATS.render());
     eprintln!("it took {:?}", start.elapsed());
 }
 
