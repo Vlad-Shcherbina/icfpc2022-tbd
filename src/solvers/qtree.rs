@@ -1,6 +1,6 @@
 use crate::util::project_path;
 use crate::image::Image;
-use crate::basic::{BlockId, Color, image_slice_distance, image_distance, Move, PainterState, Shape};
+use crate::basic::{BlockId, Color, image_slice_distance, image_distance, Move, PainterState, Shape, ApplyMoveResult};
 use crate::basic::Move::PCut;
 use crate::invocation::{record_this_invocation, Status};
 use crate::uploader::upload_solution;
@@ -152,9 +152,9 @@ fn optimize_solution(moves: &[Move], width:i32, height: i32) -> Vec<Move> {
 
     let mut painter = PainterState::new(width, height);
     for m in moves {
-        let cost = painter.apply_move(m);
+        let ApplyMoveResult{cost, new_block_ids: _} = painter.apply_move(m);
         match m {
-            Move::Color { block_id: _, color } => {
+            Move::ColorMove { block_id: _, color } => {
                 *color_costs.entry(color).or_insert(0) += cost;
             }
             _ => {}
@@ -163,7 +163,7 @@ fn optimize_solution(moves: &[Move], width:i32, height: i32) -> Vec<Move> {
 
     let max_cost_color = color_costs.iter().max_by_key(|(_k, v)| *v).unwrap().0;
     let mut optimized_moves = vec![];
-    optimized_moves.push(Move::Color {
+    optimized_moves.push(Move::ColorMove {
         block_id: BlockId::root(0),
         color: **max_cost_color,
     });
@@ -171,7 +171,7 @@ fn optimize_solution(moves: &[Move], width:i32, height: i32) -> Vec<Move> {
     // Don't paint that color in smaller blocks.
     for m in moves {
         match m {
-            Move::Color { block_id: _, color } => {
+            Move::ColorMove { block_id: _, color } => {
                 if color != *max_cost_color {
                     optimized_moves.push(m.clone());
                 }
@@ -223,7 +223,7 @@ fn qtree_solver() {
     eprintln!("cost: {}", painter.cost);
     let dist = image_distance(&img, &target);
     eprintln!("distance to target: {}", dist);
-    eprintln!("final score: {}", dist.round() as i32 + painter.cost);
+    eprintln!("final score: {}", dist.round() as i64 + painter.cost);
 
 
     let output_path = format!("outputs/qtree_{}.png", problem_id);
