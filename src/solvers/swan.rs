@@ -41,7 +41,7 @@ fn swan_solver() {
 
 
     let mut argss = vec![];
-    for num_colors in 2..=6 {
+    for num_colors in 2..=4 {
         for px in [40, 50, 80] {
             for py in [40, 50, 80] {
                 argss.push(SolverArgs { px, py, num_colors });
@@ -115,7 +115,7 @@ fn solve(args: &SolverArgs, problem: &Problem) -> (i64, Vec<Move>) {
             mini_target.set_pixel(j, i, palette[color_idx]);
         }
     }
-    let mut rects: Vec<(Shape, Color)> = crate::pack::packing(&mini_target);
+    let mut rects: Vec<(Shape, Color)> = crate::pack::packing2(&mini_target);
     for (shape, _color) in &mut rects {
         shape.x1 *= px;
         shape.y1 *= py;

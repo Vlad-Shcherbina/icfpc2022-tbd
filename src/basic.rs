@@ -6,7 +6,7 @@ use std::fmt::{Formatter, Write};
 use crate::image::Image;
 use crate::util::project_path;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, Default, Hash, PartialOrd, Ord)]
 pub struct Color(pub [u8; 4]);
 
 impl Color {
@@ -16,6 +16,12 @@ impl Color {
             d += (self.0[i] as i32 - other.0[i] as i32).pow(2);
         }
         (d as f64).sqrt()
+    }
+}
+
+impl std::fmt::Debug for Color {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Color({:?})", self.0)
     }
 }
 
