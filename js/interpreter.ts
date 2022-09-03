@@ -147,7 +147,8 @@ blocksCanvas.addEventListener('mousemove', (evt) => {
     const y = rect.bottom - evt.clientY;
     for(const [k,v] of currentBlocks.entries()) {
         if (x >= v.x && x <= v.x + v.c.width && y >= v.y && y <= v.y + v.c.height) {
-            blocksCanvas.title = k;
+            blocksCanvas.title = `${k}\nBlock {x: ${v.x}, y: ${v.y}, width: ${v.c.width}, height: ${v.c.height}}`;
+            blocksCanvas.title += `\nCursor pos: ${Math.round(x)}, ${Math.round(y)}`;
             break;
         }
     }
