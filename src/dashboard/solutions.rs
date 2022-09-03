@@ -11,25 +11,6 @@ use super::dev_server::{Request, ResponseBuilder, HandlerResult};
 pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: ResponseBuilder) -> HandlerResult {
     if req.path.is_empty() {
         let client = &mut state.lock().unwrap().client;
-
-        // let best_query = "
-        // SELECT
-        //     problem_id,
-        //     id,
-        //     data,
-        //     moves_cost,
-        //     image_distance,
-        //     (moves_cost + image_distance) AS score,
-        //     MIN(moves_cost + image_distance),
-        //     solver,
-        //     solver_args,
-        //     invocation_id,
-        //     timestamp
-        // FROM solutions
-        // GROUP BY problem_id
-        // ORDER BY score DESC
-        // ";
-
         let best_query = "
         SELECT
             id,
@@ -65,8 +46,6 @@ pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: Respo
         WHERE $1 = -1 OR $1 = problem_id
         ";
 
-        let mut query = best_query;
-
         let archive = req.query_args.remove("archive");
         let problem_id: i32 = req.query_args.remove("problem_id").map_or(-1, |s| s.parse().unwrap());
 
@@ -74,9 +53,11 @@ pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: Respo
             Some(x) => x == "true",
             None => false
         };
-        if archive {
-            query = all_query;
-        }
+        let query = if archive {
+            all_query
+        } else {
+            best_query
+        };
 
         eprintln!("RUNNING: {}", query);
 
