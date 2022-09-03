@@ -2,7 +2,7 @@
 {% block title %}ajax example{% endblock %}
 {% block body %}
 <div style="display: flex;">
-  <div style="margin-right: 2em;">
+<div style="margin-right: 2em;">
   <textarea id="input" style="width:30em;height:50em;"></textarea><br>
   <button id="back">←</button>
   <button id="forward">→</button>
@@ -13,6 +13,7 @@
   <span id="difference">Difference:</span><br>
   <span id="total_cost">Total cost:</span><br>
   <div id="step" style="max-width: 200px">Current step:</div><br>
+  <span id="error" style="color:darkred;"></span>
 </div>
 <div>
   <div style="min-width: 400px; min-height: 400px; position: relative;">
@@ -30,6 +31,7 @@
   <label for="toggle_overlay">Overlay difference heatmap</label><br>
   <label for="heatmap_color">Heatmap color</label>
   <input type="text" name="heatmap_color" id="heatmap_color" value="#ff0000"></input>
+</div>
 </div>
 <script src="/js/interpreter.js" type="module"></script>
 {% endblock %}

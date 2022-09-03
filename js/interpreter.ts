@@ -39,11 +39,24 @@ const referenceSelector = document.getElementById("reference_select") as HTMLInp
 const overlayToggle = document.getElementById("toggle_overlay") as HTMLInputElement;
 const heatmapColor = document.getElementById("heatmap_color")! as HTMLInputElement;
 const blocksToggle = document.getElementById("toggle_blocks_overlay") as HTMLInputElement;
+const errorSpan = document.getElementById("error") as HTMLSpanElement;
 
 const blocksCanvas = document.getElementById("blocks_canvas") as HTMLCanvasElement;
 const blocksCtx = blocksCanvas.getContext('2d')!;
 blocksCtx.translate(0, blocksCanvas.height);
 blocksCtx.scale(1, -1);
+
+const mainCanvas = document.getElementById("canvas") as HTMLCanvasElement;
+const mainCtx = mainCanvas.getContext("2d")!;
+mainCtx.translate(0, mainCanvas.height);
+mainCtx.scale(1, -1);
+
+const refCanvas = document.getElementById("ref_canvas") as HTMLCanvasElement;
+const refCtx = refCanvas.getContext('2d')!;
+const diffCanvas = document.getElementById("diff_canvas") as HTMLCanvasElement;
+const diffCtx = diffCanvas.getContext('2d')!;
+
+let currentBlocks = new Map<string,Block>();
 
 const parser = new Parser();
 
@@ -80,12 +93,6 @@ function save_step(blocks: Map<string, Block>, this_step_cost: number, cmd: Comm
     }
     exec_steps.push(step);
 }
-
-const mainCanvas = document.getElementById("canvas") as HTMLCanvasElement;
-const mainCtx = mainCanvas.getContext("2d")!;
-mainCtx.translate(0, mainCanvas.height);
-mainCtx.scale(1, -1);
-let currentBlocks = new Map<string,Block>();
 
 type BlockSpec = {
     blockId: string,
@@ -146,12 +153,33 @@ blocksCanvas.addEventListener('mousemove', (evt) => {
     }
 })
 
+mainCanvas.addEventListener('mousemove', (evt) => {
+    const rect = mainCanvas.getBoundingClientRect();
+    const x = evt.clientX - rect.left;
+    const y = rect.bottom - evt.clientY;
+    const y_ = evt.clientY - rect.top;
+    const pixel = refCtx.getImageData(x, y_, 1, 1);
+    const rgba = `[${pixel.data[0]}, ${pixel.data[1]}, ${pixel.data[2]}, ${pixel.data[3]}]`
+    mainCanvas.title = `${Math.round(x)}, ${Math.round(y)}; ${rgba}`;
+});
+
+refCanvas.addEventListener('mousemove', (evt) => {
+    const rect = refCanvas.getBoundingClientRect();
+    const x = evt.clientX - rect.left;
+    const y = rect.bottom - evt.clientY;
+    const y_ = evt.clientY - rect.top;
+    const pixel = refCtx.getImageData(x, y_, 1, 1);
+    const rgba = `[${pixel.data[0]}, ${pixel.data[1]}, ${pixel.data[2]}, ${pixel.data[3]}]`
+    refCanvas.title = `${Math.round(x)}, ${Math.round(y)}; ${rgba}`;
+});
+
 let currentIndex = 0;
 
 run.addEventListener('click', () => {
     const input = inputBox.value;
     const parsed = parser.parse(lex(input)).filter((x: any) => x !== null) as Command[];
     const blocks = new Map<string, Block>();
+    errorSpan.innerText = "";
     exec_steps = [];
     currentIndex = 0;
     let counter = initialCanvas.blocks.length;
@@ -184,132 +212,149 @@ run.addEventListener('click', () => {
         return newBlock;
     }
     let cost = 0;
+    let lastCmd = null;
+    let cmdCount = 0;
 
-    for (const cmd of parsed) {
-        let this_step_cost: number;
-        const cost_est = step_cost.bind(this, cmd.type, initialCanvas);
-        switch(cmd.type) {
-            case "cut-point": {
-                const blk = blocks.get(cmd.block);
-                if (!blk) throw new Error(`No such block: ${cmd.block}`);
-                this_step_cost = cost_est(blk.c);
-                cmd.point[0] -= blk.x;
-                cmd.point[1] -= blk.y;
-                if (cmd.point[0] <= 0 || cmd.point[0] >= blk.c.width) throw new Error('Point is on block border in x dimension');
-                if (cmd.point[1] <= 0 || cmd.point[1] >= blk.c.height) throw new Error('Point is on block border in y dimension');
-                blocks.delete(cmd.block);
-                blocks.set(`${cmd.block}.0`, { x: blk.x, y: blk.y, c: copyFrom(blk.c, 0, 0, cmd.point[0], cmd.point[1]) });
-                blocks.set(`${cmd.block}.1`, { x: blk.x + cmd.point[0], y: blk.y,
-                    c: copyFrom(blk.c, cmd.point[0], 0, blk.c.width - cmd.point[0], cmd.point[1]) });
-                blocks.set(`${cmd.block}.2`, { x: blk.x + cmd.point[0], y: blk.y + cmd.point[1],
-                    c: copyFrom(blk.c, cmd.point[0], cmd.point[1], blk.c.width - cmd.point[0], blk.c.height - cmd.point[1]) });
-                blocks.set(`${cmd.block}.3`, { x: blk.x, y: blk.y + cmd.point[1],
-                    c: copyFrom(blk.c, 0, cmd.point[1], cmd.point[0], blk.c.height - cmd.point[1]) });
-                break;
-            }
-            case "cut-line": {
-                const blk = blocks.get(cmd.block);
-                if (!blk) throw new Error(`No such block: ${cmd.block}`);
-                this_step_cost = cost_est(blk.c);
-                const blksize = cmd.dir == "x" ? blk.c.width : blk.c.height;
-                if (cmd.dir === "x") {
-                    cmd.num -= blk.x;
-                } else if (cmd.dir === "y") {
-                    cmd.num -= blk.y;
-                }
-                if (cmd.num <= 0 || cmd.num >= blksize) throw new Error(`Point is on block border in ${cmd.dir} dimension`);
-                blocks.delete(cmd.block);
-                if (cmd.dir === "x") {
-                    blocks.set(`${cmd.block}.0`, { x: blk.x, y: blk.y,
-                        c: copyFrom(blk.c, 0, 0, cmd.num, blk.c.height) });
-                    blocks.set(`${cmd.block}.1`, { x: blk.x + cmd.num, y: blk.y,
-                        c: copyFrom(blk.c, cmd.num, 0, blk.c.width - cmd.num, blk.c.height) });
-                } else if (cmd.dir === "y") {
-                    blocks.set(`${cmd.block}.0`, { x: blk.x, y: blk.y,
-                        c: copyFrom(blk.c, 0, 0, blk.c.width, cmd.num) });
-                    blocks.set(`${cmd.block}.1`, { x: blk.x, y: blk.y + cmd.num,
-                        c: copyFrom(blk.c, 0, cmd.num, blk.c.width, blk.c.height - cmd.num) });
-                }
-                break;
-            }
-            case "color": {
-                const blk = blocks.get(cmd.block);
-                if (!blk) throw new Error(`No such block: ${cmd.block}`);
-                this_step_cost = cost_est(blk.c);
-                const ctx = blk.c.getContext('2d')!;
-                // a hack to behave like the playground: pre-fill with white
-                ctx.fillStyle='rgba(255,255,255,1)';
-                ctx.fillRect(0, 0, blk.c.width, blk.c.height);
-                // end hack
-                ctx.fillStyle = `rgba(${cmd.color[0]}, ${cmd.color[1]}, ${cmd.color[2]}, ${cmd.color[3]/255.0})`;
-                ctx.fillRect(0, 0, blk.c.width, blk.c.height);
-                break;
-            }
-            case "swap": {
-                const blk1 = blocks.get(cmd.block1);
-                const blk2 = blocks.get(cmd.block2);
-                if (!blk1) throw new Error(`No such block: ${cmd.block1}`);
-                if (!blk2) throw new Error(`No such block: ${cmd.block2}`);
-                if (blk1.c.width !== blk2.c.width || blk1.c.height !== blk2.c.height) {
-                    throw new Error(`Block shapes are incompatible for ${cmd.block1} and ${cmd.block2}`);
-                }
-                this_step_cost = cost_est(blk1.c);
-                const x1 = blk1.x;
-                const y1 = blk1.y;
-                blk1.x = blk2.x;
-                blk1.y = blk2.y;
-                blk2.x = x1;
-                blk2.y = y1;
-                break;
-            }
-            case "merge": {
-                const blk1 = blocks.get(cmd.block1);
-                const blk2 = blocks.get(cmd.block2);
-                if (!blk1) throw new Error(`No such block: ${cmd.block1}`);
-                if (!blk2) throw new Error(`No such block: ${cmd.block2}`);
-                // block_size = max(size(blk1), size(blk2)), according to organizers
-                // since cost is inversely proportional to block size, all else being equal,
-                // we use minimal cost of the two.
-                this_step_cost = Math.min(cost_est(blk1.c), cost_est(blk2.c));
-                if (blk1.x === blk2.x) {
-                    if (blk1.c.width !== blk2.c.width) {
-                        throw new Error(`Blocks ${cmd.block1} and ${cmd.block2} are not compatible for merge: width differs`);
+    try {
+        for (const cmd of parsed) {
+            lastCmd = cmd;
+            cmdCount += 1;
+            let this_step_cost: number;
+            const cost_est = step_cost.bind(this, cmd.type, initialCanvas);
+            switch(cmd.type) {
+                case "cut-point": {
+                    const blk = blocks.get(cmd.block);
+                    if (!blk) throw new Error(`No such block: ${cmd.block}`);
+                    this_step_cost = cost_est(blk.c);
+                    let [x, y] = cmd.point
+                    x -= blk.x;
+                    y -= blk.y;
+                    if (x <= 0 || x >= blk.c.width) {
+                        throw new Error(`Point ${cmd.point} is on block border or outside of block ${cmd.block} in x dimension`);
                     }
-                    if (blk2.y - blk1.y !== blk1.c.height && blk1.y-blk2.y !== blk2.c.height) {
-                        throw new Error(`Blocks ${cmd.block1} and ${cmd.block2} are not adjacent`);
+                    if (y <= 0 || y >= blk.c.height) {
+                        throw new Error(`Point ${cmd.point} is on block border or outside of block ${cmd.block} in y dimension`);
                     }
-                    const minY = Math.min(blk1.y, blk2.y);
-                    const oldX = blk1.x;
-                    blk1.y -= minY;
-                    blk2.y -= minY;
-                    blk1.x = blk2.x = 0;
-                    mergeBlocks(oldX, minY, blk1.c.width, blk1.c.height + blk2.c.height, blk1, blk2);
-                } else if (blk1.y === blk2.y) {
-                    if (blk1.c.height !== blk2.c.height) {
-                        throw new Error(`Blocks ${cmd.block1} and ${cmd.block2} are not compatible for merge: height differs`);
-                    }
-                    if (blk2.x - blk1.x !== blk1.c.width && blk1.x-blk2.x !== blk2.c.width) {
-                        throw new Error(`Blocks ${cmd.block1} and ${cmd.block2} are not adjacent`);
-                    }
-                    const minX = Math.min(blk1.x, blk2.x);
-                    const oldY = blk1.y;
-                    blk1.x -= minX;
-                    blk2.x -= minX;
-                    blk1.y = blk2.y = 0;
-                    mergeBlocks(minX, oldY, blk1.c.width + blk2.c.width, blk1.c.height, blk1, blk2);
-                } else {
-                    throw new Error("Blocks to be merged are not aligned");
+                    blocks.delete(cmd.block);
+                    blocks.set(`${cmd.block}.0`, { x: blk.x, y: blk.y, c: copyFrom(blk.c, 0, 0, x, y) });
+                    blocks.set(`${cmd.block}.1`, { x: blk.x + x, y: blk.y,
+                        c: copyFrom(blk.c, x, 0, blk.c.width - x, y) });
+                    blocks.set(`${cmd.block}.2`, { x: blk.x + x, y: blk.y + y,
+                        c: copyFrom(blk.c, x, y, blk.c.width - x, blk.c.height - y) });
+                    blocks.set(`${cmd.block}.3`, { x: blk.x, y: blk.y + y,
+                        c: copyFrom(blk.c, 0, y, x, blk.c.height - y) });
+                    break;
                 }
-                blocks.delete(cmd.block1)
-                blocks.delete(cmd.block2)
-                break;
+                case "cut-line": {
+                    const blk = blocks.get(cmd.block);
+                    if (!blk) throw new Error(`No such block: ${cmd.block}`);
+                    this_step_cost = cost_est(blk.c);
+                    const blksize = cmd.dir == "x" ? blk.c.width : blk.c.height;
+                    let num = cmd.num;
+                    if (cmd.dir === "x") {
+                        num -= blk.x;
+                    } else if (cmd.dir === "y") {
+                        num -= blk.y;
+                    }
+                    if (num <= 0 || num >= blksize) {
+                        throw new Error(`Point ${cmd.num} is on block border or outside of block ${cmd.block} in ${cmd.dir} dimension`);
+                    }
+                    blocks.delete(cmd.block);
+                    if (cmd.dir === "x") {
+                        blocks.set(`${cmd.block}.0`, { x: blk.x, y: blk.y,
+                            c: copyFrom(blk.c, 0, 0, num, blk.c.height) });
+                        blocks.set(`${cmd.block}.1`, { x: blk.x + num, y: blk.y,
+                            c: copyFrom(blk.c, num, 0, blk.c.width - num, blk.c.height) });
+                    } else if (cmd.dir === "y") {
+                        blocks.set(`${cmd.block}.0`, { x: blk.x, y: blk.y,
+                            c: copyFrom(blk.c, 0, 0, blk.c.width, num) });
+                        blocks.set(`${cmd.block}.1`, { x: blk.x, y: blk.y + num,
+                            c: copyFrom(blk.c, 0, num, blk.c.width, blk.c.height - num) });
+                    }
+                    break;
+                }
+                case "color": {
+                    const blk = blocks.get(cmd.block);
+                    if (!blk) throw new Error(`No such block: ${cmd.block}`);
+                    this_step_cost = cost_est(blk.c);
+                    const ctx = blk.c.getContext('2d')!;
+                    // a hack to behave like the playground: pre-fill with white
+                    ctx.fillStyle='rgba(255,255,255,1)';
+                    ctx.fillRect(0, 0, blk.c.width, blk.c.height);
+                    // end hack
+                    ctx.fillStyle = `rgba(${cmd.color[0]}, ${cmd.color[1]}, ${cmd.color[2]}, ${cmd.color[3]/255.0})`;
+                    ctx.fillRect(0, 0, blk.c.width, blk.c.height);
+                    break;
+                }
+                case "swap": {
+                    const blk1 = blocks.get(cmd.block1);
+                    const blk2 = blocks.get(cmd.block2);
+                    if (!blk1) throw new Error(`No such block: ${cmd.block1}`);
+                    if (!blk2) throw new Error(`No such block: ${cmd.block2}`);
+                    if (blk1.c.width !== blk2.c.width || blk1.c.height !== blk2.c.height) {
+                        throw new Error(`Block shapes are incompatible for ${cmd.block1} and ${cmd.block2}`);
+                    }
+                    this_step_cost = cost_est(blk1.c);
+                    const x1 = blk1.x;
+                    const y1 = blk1.y;
+                    blk1.x = blk2.x;
+                    blk1.y = blk2.y;
+                    blk2.x = x1;
+                    blk2.y = y1;
+                    break;
+                }
+                case "merge": {
+                    const blk1 = blocks.get(cmd.block1);
+                    const blk2 = blocks.get(cmd.block2);
+                    if (!blk1) throw new Error(`No such block: ${cmd.block1}`);
+                    if (!blk2) throw new Error(`No such block: ${cmd.block2}`);
+                    // block_size = max(size(blk1), size(blk2)), according to organizers
+                    // since cost is inversely proportional to block size, all else being equal,
+                    // we use minimal cost of the two.
+                    this_step_cost = Math.min(cost_est(blk1.c), cost_est(blk2.c));
+                    if (blk1.x === blk2.x) {
+                        if (blk1.c.width !== blk2.c.width) {
+                            throw new Error(`Blocks ${cmd.block1} and ${cmd.block2} are not compatible for merge: width differs`);
+                        }
+                        if (blk2.y - blk1.y !== blk1.c.height && blk1.y-blk2.y !== blk2.c.height) {
+                            throw new Error(`Blocks ${cmd.block1} and ${cmd.block2} are not adjacent`);
+                        }
+                        const minY = Math.min(blk1.y, blk2.y);
+                        const oldX = blk1.x;
+                        blk1.y -= minY;
+                        blk2.y -= minY;
+                        blk1.x = blk2.x = 0;
+                        mergeBlocks(oldX, minY, blk1.c.width, blk1.c.height + blk2.c.height, blk1, blk2);
+                    } else if (blk1.y === blk2.y) {
+                        if (blk1.c.height !== blk2.c.height) {
+                            throw new Error(`Blocks ${cmd.block1} and ${cmd.block2} are not compatible for merge: height differs`);
+                        }
+                        if (blk2.x - blk1.x !== blk1.c.width && blk1.x-blk2.x !== blk2.c.width) {
+                            throw new Error(`Blocks ${cmd.block1} and ${cmd.block2} are not adjacent`);
+                        }
+                        const minX = Math.min(blk1.x, blk2.x);
+                        const oldY = blk1.y;
+                        blk1.x -= minX;
+                        blk2.x -= minX;
+                        blk1.y = blk2.y = 0;
+                        mergeBlocks(minX, oldY, blk1.c.width + blk2.c.width, blk1.c.height, blk1, blk2);
+                    } else {
+                        throw new Error("Blocks to be merged are not aligned");
+                    }
+                    blocks.delete(cmd.block1)
+                    blocks.delete(cmd.block2)
+                    break;
+                }
+                case "comment":
+                    this_step_cost = 0;
+                    cmdCount -= 1;
+                    break;
             }
-            case "comment":
-                this_step_cost = 0;
-                break;
+            cost += this_step_cost;
+            save_step(blocks, this_step_cost, cmd);
         }
-        cost += this_step_cost;
-        save_step(blocks, this_step_cost, cmd);
+    } catch (e) {
+        errorSpan.innerText = `${(e as Error).message} in command ${cmdCount}: ${JSON.stringify(lastCmd)}`;
     }
     render(blocks);
     costSpan.innerText = `Cost: ${cost}`;
@@ -323,10 +368,14 @@ function selectCurrentCommand() {
     const text = inputBox.value;
     const lines = text.split('\n');
     let posStart = 0;
-    for(const line of lines.slice(0, currentIndex-1)) {
+    let curCmd = 0;
+    let lastLine = lines[0];
+    for(const line of lines) {
+        lastLine = line;
+        if (line) curCmd += 1;
+        if (curCmd == currentIndex) break;
         posStart += line.length+1;
     }
-    const lastLine = lines[currentIndex-1];
     if (lastLine === undefined) return;
     const posEnd = posStart + lastLine.length + 1;
     inputBox.focus();
@@ -357,11 +406,9 @@ referenceFile.addEventListener('input', async (evt: Event) => {
     const target = evt.target! as HTMLInputElement
     const file = target.files![0]
     const bitmap = await createImageBitmap(file);
-    const canvas = document.getElementById("ref_canvas") as HTMLCanvasElement;
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-    const ctx = canvas.getContext("2d")!;
-    ctx.drawImage(bitmap, 0, 0);
+    refCanvas.width = bitmap.width;
+    refCanvas.height = bitmap.height;
+    refCtx.drawImage(bitmap, 0, 0);
 })
 
 type RGBA = {r: number, g: number, b: number, a: number};
@@ -383,16 +430,12 @@ function rgbaAt(i: number, img: ImageData): RGBA {
 }
 
 function computeDifference() {
-    const ref_canvas = document.getElementById("ref_canvas") as HTMLCanvasElement;
-    const canvas = document.getElementById("canvas") as HTMLCanvasElement;
-    const diff_canvas = document.getElementById("diff_canvas") as HTMLCanvasElement;
-    const ctx = diff_canvas.getContext('2d')!;
     // fill with solid color, show difference with alpha-channel
-    ctx.fillStyle = heatmapColor.value;
-    ctx.fillRect(0,0,diff_canvas.width, diff_canvas.height);
-    const ref_image = ref_canvas.getContext('2d')!.getImageData(0, 0, ref_canvas.width, ref_canvas.height);
-    const image = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height);
-    const diff_image = diff_canvas.getContext('2d')!.getImageData(0, 0, diff_canvas.width, diff_canvas.height);
+    diffCtx.fillStyle = heatmapColor.value;
+    diffCtx.fillRect(0,0,diffCanvas.width, diffCanvas.height);
+    const ref_image = refCtx.getImageData(0, 0, refCanvas.width, refCanvas.height);
+    const image = mainCtx.getImageData(0, 0, mainCanvas.width, mainCanvas.height);
+    const diff_image = diffCtx.getImageData(0, 0, diffCanvas.width, diffCanvas.height);
     let diff = 0;
     let alpha = 0.005;
     for(let i = 0; i < image.data.length; i += 4) {
@@ -404,7 +447,7 @@ function computeDifference() {
         // max pxdiff is sqrt(4*255**2) = 2*255 => max alpha value is half max pxdiff.
         diff_image.data[i+3] = Math.round(pxdiff / 2);
     }
-    ctx.putImageData(diff_image, 0, 0);
+    diffCtx.putImageData(diff_image, 0, 0);
     return Math.round(diff*alpha);
 }
 
@@ -422,11 +465,9 @@ async function loadReferenceImage() {
     const img = new Image();
     img.src = `${window.location.protocol}//${window.location.host}/data/problems/${referenceSelector.value}`;
     await new Promise((resolve) => img.onload=resolve)
-    const canvas = document.getElementById("ref_canvas") as HTMLCanvasElement;
-    canvas.width = img.width;
-    canvas.height = img.height;
-    const ctx = canvas.getContext("2d")!;
-    ctx.drawImage(img, 0, 0);
+    refCanvas.width = img.width;
+    refCanvas.height = img.height;
+    refCtx.drawImage(img, 0, 0);
     try {
         initialCanvas = await (await fetch(`${window.location.protocol}//${window.location.host}/data/problems/${referenceSelector.value.replace("png","initial.json")}`)).json() as InitialCanvas;
     } catch (e) {
@@ -437,14 +478,12 @@ async function loadReferenceImage() {
 }
 
 function updateOverlayStyle() {
-    const ref_canvas = document.getElementById("ref_canvas") as HTMLCanvasElement;
-    const diff_canvas = document.getElementById("diff_canvas") as HTMLCanvasElement;
     if (overlayToggle.checked) {
-        ref_canvas.style.position = 'absolute';
-        diff_canvas.style.position = 'absolute';
+        refCanvas.style.position = 'absolute';
+        diffCanvas.style.position = 'absolute';
     } else {
-        ref_canvas.style.position = 'relative';
-        diff_canvas.style.position = 'relative';
+        refCanvas.style.position = 'relative';
+        diffCanvas.style.position = 'relative';
     }
     updateHash();
 }
