@@ -76,7 +76,7 @@ fn optimal_color_for_color_freqs(color_freqs: &HashMap<Color, f64>) -> Color {
     for _ in 0..K_STEP_NUM {
         gradient_step(color_freqs, &mut color_array, step_size);
         let new_dist = dist_to_color_freqs(color_freqs, &f64_to_color(&color_array));
-        if new_dist.abs() > last_dist.abs() { break; }
+        if step_size != 1.0 && new_dist.abs() > last_dist.abs() { break; }
         last_dist = new_dist;
         last_color = color_array;
 
