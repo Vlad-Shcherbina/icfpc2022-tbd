@@ -214,6 +214,17 @@ struct SolutionsTemplate {
     <img src="/data/problems/{{ problem_id }}.png"/>
 </p>
 <pre>{{ data }}</pre>
+<a id="run_in_interpreter">Run in visualizer</a>
+<script>
+(function (){
+const a = document.getElementById("run_in_interpreter");
+const hash = btoa(JSON.stringify({
+    input: `{{data}}`,
+    reference: "{{problem_id}}.png",
+}));
+a.href = `/example/interpreter#${hash}`;
+})();
+</script>
 {% endblock %}
 "#)]
 struct SolutionTemplate {
