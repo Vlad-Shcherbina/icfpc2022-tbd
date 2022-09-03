@@ -554,7 +554,8 @@ impl PainterState {
                 actions.push(RemoveBlock { block_id: block_id1.clone(), removed_value: block1.clone() });
                 actions.push(RemoveBlock { block_id: block_id2.clone(), removed_value: block2.clone() });
                 let mut new_block = Block {
-                    shape: merge_shapes(block1.shape, block2.shape),
+                    shape: merge_shapes(block1.shape, block2.shape).unwrap_or_else(||
+                        panic!("merging blocks that are not adjacent {:?} {:?} (in move {})", block1.shape, block2.shape, m)),
                     pieces: block1.pieces,
                 };
                 new_block.pieces.extend(block2.pieces);
@@ -595,41 +596,41 @@ impl PainterState {
     }
 }
 
-fn merge_shapes(shape1: Shape, shape2: Shape) -> Shape {
+fn merge_shapes(shape1: Shape, shape2: Shape) -> Option<Shape> {
     if shape1.x2 == shape2.x1 && shape1.y1 == shape2.y1 && shape1.y2 == shape2.y2 {
         // 1 to the left of 2
-        Shape {
+        Some(Shape {
             x1: shape1.x1,
             y1: shape1.y1,
             x2: shape2.x2,
             y2: shape2.y2,
-        }
+        })
     } else if shape2.x2 == shape1.x1 && shape1.y1 == shape2.y1 && shape1.y2 == shape2.y2 {
         // 2 to the left of 1
-        Shape {
+        Some(Shape {
             x1: shape2.x1,
             y1: shape2.y1,
             x2: shape1.x2,
             y2: shape1.y2,
-        }
+        })
     } else if shape1.y2 == shape2.y1 && shape1.x1 == shape2.x1 && shape1.x2 == shape2.x2 {
         // 2 on top of 1
-        Shape {
+        Some(Shape {
             x1: shape1.x1,
             y1: shape1.y1,
             x2: shape2.x2,
             y2: shape2.y2,
-        }
+        })
     } else if shape2.y2 == shape1.y1 && shape1.x1 == shape2.x1 && shape1.x2 == shape2.x2 {
         // 1 on top of 2
-        Shape {
+        Some(Shape {
             x1: shape2.x1,
             y1: shape2.y1,
             x2: shape1.x2,
             y2: shape1.y2,
-        }
+        })
     } else {
-        panic!("merging blocks that are not adjacent {:?} {:?}", shape1, shape2);
+        None
     }
 }
 
