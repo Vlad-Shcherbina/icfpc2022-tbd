@@ -23,9 +23,6 @@ fn shape_distance(colors: &HashMap<Color, f64>, color: &Color) -> f64 {
     d
 }
 
-static K_STEP_NUM: i32 = 500;
-static K_STEP: f64 = 0.8;
-
 fn gradient_step(colors: &HashMap<Color, f64>, color: &mut [f64; 4], step_size: f64) {
     let mut gradient = [0f64; 4];
     for (k, v) in colors {
@@ -67,8 +64,12 @@ pub fn color_freqs(pic: &Image, shape: &Shape) -> HashMap<Color, f64> {
     colors
 }
 
+const K_STEP_NUM: i32 = 500;
+const K_STEP: f64 = 0.8;
+
 fn optimal_color_for_color_freqs(color_freqs: &HashMap<Color, f64>) -> Color {
-    let color = Color::default();
+    let _t = crate::stats_timer!("optimal_color_for_color_freqs").time_it();
+    let color = Color([128; 4]);
     let mut color_array = color_to_f64(&color);
     let mut step_size: f64 = 100.0;
     let mut last_color = color_array;
