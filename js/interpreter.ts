@@ -87,6 +87,32 @@ mainCtx.translate(0, mainCanvas.height);
 mainCtx.scale(1, -1);
 let currentBlocks = new Map<string,Block>();
 
+type BlockSpec = {
+    blockId: string,
+    bottomLeft: Point,
+    topRight: Point,
+    color: Color,
+}
+
+type InitialCanvas = {
+    width: number,
+    height: number,
+    blocks: BlockSpec[],
+}
+
+const defaultCanvas : InitialCanvas = {
+    width: 400,
+    height: 400,
+    blocks: [{
+        blockId: "0",
+        bottomLeft: [0, 0],
+        topRight: [400, 400],
+        color: [255,255,255,255],
+    }]
+};
+
+let initialCanvas : InitialCanvas = defaultCanvas;
+
 function render(blocks: Map<string, Block>) {
     currentBlocks = blocks;
     blocksCtx.clearRect(0,0,blocksCanvas.width, blocksCanvas.height);
@@ -112,7 +138,6 @@ blocksCanvas.addEventListener('mousemove', (evt) => {
     const rect = blocksCanvas.getBoundingClientRect();
     const x = evt.clientX - rect.left;
     const y = rect.bottom - evt.clientY;
-    console.log(x,y);
     for(const [k,v] of currentBlocks.entries()) {
         if (x >= v.x && x <= v.x + v.c.width && y >= v.y && y <= v.y + v.c.height) {
             blocksCanvas.title = k;
@@ -129,14 +154,20 @@ run.addEventListener('click', () => {
     const blocks = new Map<string, Block>();
     exec_steps = [];
     currentIndex = 0;
-    let counter = 1;
-    const canvas0 = document.createElement('canvas');
-    canvas0.width=400
-    canvas0.height=400
-    const ctx0 = canvas0.getContext('2d')!;
-    ctx0.fillStyle="rgba(255,255,255,1)"
-    ctx0.fillRect(0, 0, 400, 400);
-    blocks.set("0", {x: 0, y: 0, c: canvas0})
+    let counter = initialCanvas.blocks.length;
+    for(const block of initialCanvas.blocks){
+        const canvas = document.createElement('canvas');
+        canvas.width = block.topRight[0] - block.bottomLeft[0]
+        canvas.height = block.topRight[1] - block.bottomLeft[1]
+        const ctx = canvas.getContext('2d')!;
+        // a hack to behave like the playground: pre-fill with white
+        ctx.fillStyle='rgba(255,255,255,1)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // end hack
+        ctx.fillStyle = `rgba(${block.color[0]}, ${block.color[1]}, ${block.color[2]}, ${block.color[3]/255.0})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        blocks.set(block.blockId, {x: block.bottomLeft[0], y: block.bottomLeft[1], c: canvas})
+    }
     save_step(blocks, 0, {type: "comment", text: "Initial state"});
 
     function mergeBlocks(x:number, y: number, w: number, h: number, blk1: Block, blk2: Block) {
@@ -156,7 +187,7 @@ run.addEventListener('click', () => {
 
     for (const cmd of parsed) {
         let this_step_cost: number;
-        const cost_est = step_cost.bind(this, cmd.type, canvas0);
+        const cost_est = step_cost.bind(this, cmd.type, initialCanvas);
         switch(cmd.type) {
             case "cut-point": {
                 const blk = blocks.get(cmd.block);
@@ -315,7 +346,6 @@ forward.addEventListener('click', () => {
 referenceFile.addEventListener('input', async (evt: Event) => {
     const target = evt.target! as HTMLInputElement
     const file = target.files![0]
-    console.log(file)
     const bitmap = await createImageBitmap(file);
     const canvas = document.getElementById("ref_canvas") as HTMLCanvasElement;
     canvas.width = bitmap.width;
@@ -387,6 +417,12 @@ async function loadReferenceImage() {
     canvas.height = img.height;
     const ctx = canvas.getContext("2d")!;
     ctx.drawImage(img, 0, 0);
+    try {
+        initialCanvas = await (await fetch(`${window.location.protocol}//${window.location.host}/data/problems/${referenceSelector.value.replace("png","initial.json")}`)).json() as InitialCanvas;
+    } catch (e) {
+        console.error(e);
+        initialCanvas = defaultCanvas;
+    }
     updateHash();
 }
 
@@ -418,7 +454,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     referenceSelector.addEventListener('change', () => {
         loadReferenceImage();
     })
-    for(let i = 1; i<= 25; i++) {
+    for(let i = 1; i<= 30; i++) {
         const option = document.createElement('option');
         option.value = `${i}.png`;
         option.innerText = option.value;
