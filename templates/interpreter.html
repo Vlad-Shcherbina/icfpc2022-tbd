@@ -1,29 +1,35 @@
 {% extends "base.html" %}
 {% block title %}ajax example{% endblock %}
 {% block body %}
-<textarea id="input" style="width:30em;height:50em;"></textarea><br>
-<button id="back">←</button>
-<button id="forward">→</button>
-<button id="run" type="submit">Run</button><br>
-<input type="file" id="reference"></input><br>
-<select id="reference_select"></select><br>
-<span id="cost">Cost:</span><br>
-<span id="difference">Difference:</span><br>
-<span id="total_cost">Total cost:</span><br>
-<span id="step">Current step:</span><br>
-<div style="min-width: 400px; min-height: 400px; position: relative;">
-<canvas id="canvas" width="400" height="400" style="position: relative; left: 0; top: 0;"></canvas>
-<canvas id="blocks_canvas" width="400" height="400" style="position: relative; left: 0; top: 0; mix-blend-mode: difference;"></canvas>
+<div style="display: flex;">
+  <div style="margin-right: 2em;">
+  <textarea id="input" style="width:30em;height:50em;"></textarea><br>
+  <button id="back">←</button>
+  <button id="forward">→</button>
+  <button id="run" type="submit">Run</button><br>
+  <input type="file" id="reference"></input><br>
+  <select id="reference_select"></select><br>
+  <span id="cost">Cost:</span><br>
+  <span id="difference">Difference:</span><br>
+  <span id="total_cost">Total cost:</span><br>
+  <span id="step">Current step:</span><br>
 </div>
-<input type="checkbox" name="toggle_blocks_overlay" id="toggle_blocks_overlay"></input>
-<label for="toggle_blocks_overlay">Overlay blocks</label><br>
-<div style="min-width: 400px; min-height: 400px; position: relative;">
-<canvas id="ref_canvas" width="400" height="400" style="position: relative; left: 0; top: 0;"></canvas>
-<canvas id="diff_canvas" width="400" height="400" style="position: relative; left: 0; top: 0;"></canvas>
+<div>
+  <div style="min-width: 400px; min-height: 400px; position: relative;">
+    <canvas id="canvas" width="400" height="400" style="position: relative; left: 0; top: 0;"></canvas>
+    <canvas id="blocks_canvas" width="400" height="400"
+      style="position: relative; left: 0; top: 0; mix-blend-mode: difference;"></canvas>
+  </div>
+  <input type="checkbox" name="toggle_blocks_overlay" id="toggle_blocks_overlay"></input>
+  <label for="toggle_blocks_overlay">Overlay blocks</label><br>
+  <div style="min-width: 400px; min-height: 400px; position: relative;">
+    <canvas id="ref_canvas" width="400" height="400" style="position: relative; left: 0; top: 0;"></canvas>
+    <canvas id="diff_canvas" width="400" height="400" style="position: relative; left: 0; top: 0;"></canvas>
+  </div>
+  <input type="checkbox" name="toggle_overlay" id="toggle_overlay"></input>
+  <label for="toggle_overlay">Overlay difference heatmap</label><br>
+  <label for="heatmap_color">Heatmap color</label>
+  <input type="text" name="heatmap_color" id="heatmap_color" value="#ff0000"></input>
 </div>
-<input type="checkbox" name="toggle_overlay" id="toggle_overlay"></input>
-<label for="toggle_overlay">Overlay difference heatmap</label><br>
-<label for="heatmap_color">Heatmap color</label>
-<input type="text" name="heatmap_color" id="heatmap_color" value="#ff0000"></input>
 <script src="/js/interpreter.js" type="module"></script>
 {% endblock %}
