@@ -709,3 +709,104 @@ fn test_rollback() {
 }
 
 
+fn check_score(problem_id: i32, sol: &str, expected_cost: i64, expected_dist: i64, total_score: i64) {
+    eprintln!("---");
+    dbg!(problem_id);
+    let target = Image::load(&crate::util::project_path(&format!("data/problems/{}.png", problem_id)));
+    let mut painter = PainterState::new(target.width, target.height);
+    let moves = Move::parse_many(sol);
+    for m in &moves {
+        painter.apply_move(m);
+    }
+    let img = painter.render();
+    let dist = image_distance(&img, &target).round() as i64;
+    dbg!(painter.cost);
+    dbg!(dist);
+    dbg!(painter.cost + dist);
+    assert_eq!(painter.cost, expected_cost);
+    assert_eq!(dist, expected_dist);
+    assert_eq!(painter.cost + dist, total_score);
+}
+
+#[cfg(test)]
+#[test]
+// Total score was compared with the official validator.
+fn test_score_calculation() {
+    check_score(1, "color [0] [20, 50, 60, 90]", 5, 217215, 217220);
+
+    // merge
+    check_score(1, "
+        color [0] [20, 50, 60, 90]
+        cut [0] [x] [100]
+        merge [0.0] [0.1]
+    ", 13, 217215, 217228);
+
+    // Arsenij's manual solution
+    check_score(1, "
+        color [0] [255, 255, 255, 255]
+        cut [0] [320, 80]
+        cut [0.2] [x] [360]
+        cut [0.0] [y] [40]
+        color [0.1] [0, 74, 175, 255]
+        color [0.2.1] [0, 74, 175, 255]
+        color [0.0.0] [0, 74, 175, 255]
+        cut [0.3] [160, 240]
+        color [0.0.1] [0, 0, 0, 255]
+        color [0.3.0] [0, 0, 0, 255]
+        color [0.3.1] [0, 0, 0, 255]
+        cut [0.3.3] [80, 320]
+        cut [0.3.3.3] [40, 360]
+        cut [0.3.3.2] [120, 360]
+        cut [0.3.3.0] [40, 280]
+        cut [0.3.3.1] [120, 280]
+        cut [0.3.2] [240, 320]
+        cut [0.3.2.3] [200, 360]
+        cut [0.3.2.2] [280, 360]
+        cut [0.3.2.0] [200, 280]
+        cut [0.3.2.1] [280, 280]
+        cut [0.3.0] [80, 160]
+        cut [0.3.0.3] [40, 200]
+        cut [0.3.0.2] [120, 200]
+        cut [0.3.0.0] [40, 120]
+        cut [0.3.0.1] [120, 120]
+        cut [0.3.1] [240, 160]
+        cut [0.3.1.3] [200, 200]
+        cut [0.3.1.2] [280, 200]
+        cut [0.3.1.0] [200, 120]
+        cut [0.3.1.1] [280, 120]
+        cut [0.2.0] [y] [240]
+        cut [0.2.0.1] [y] [320]
+        cut [0.2.0.1.1] [y] [360]
+        cut [0.2.0.1.0] [y] [280]
+        cut [0.2.0.0] [y] [160]
+        cut [0.2.0.0.1] [y] [200]
+        cut [0.2.0.0.0] [y] [120]
+        cut [0.0.1] [x] [160]
+        cut [0.0.1.0] [x] [80]
+        cut [0.0.1.0.0] [x] [40]
+        cut [0.0.1.0.1] [x] [120]
+        cut [0.0.1.1] [x] [240]
+        cut [0.0.1.1.0] [x] [200]
+        cut [0.0.1.1.1] [x] [280]
+        swap [0.3.3.3.2] [0.3.0.3.3]
+        swap [0.3.3.3.0] [0.3.0.3.1]
+        swap [0.3.3.2.2] [0.3.0.2.3]
+        swap [0.3.3.2.0] [0.3.0.2.1]
+        swap [0.3.3.0.2] [0.3.0.0.3]
+        swap [0.3.3.0.0] [0.3.0.0.1]
+        swap [0.3.3.1.2] [0.3.0.1.3]
+        swap [0.3.3.1.0] [0.3.0.1.1]
+        swap [0.3.2.3.2] [0.3.1.3.3]
+        swap [0.3.2.3.0] [0.3.1.3.1]
+        swap [0.3.2.2.2] [0.3.1.2.3]
+        swap [0.3.2.2.0] [0.3.1.2.1]
+        swap [0.3.2.0.2] [0.3.1.0.3]
+        swap [0.3.2.0.0] [0.3.1.0.1]
+        swap [0.3.2.1.2] [0.3.1.1.3]
+        swap [0.3.2.1.0] [0.3.1.1.1]
+        swap [0.2.0.1.1.0] [0.0.1.0.0.0]
+        swap [0.2.0.0.0.0] [0.0.1.1.1.0]
+        swap [0.2.0.1.0.0] [0.0.1.0.1.0]
+        swap [0.2.0.0.1.0] [0.0.1.1.0.0]
+    ", 14423, 20618, 35041);
+}
