@@ -1,4 +1,4 @@
-use crate::basic::Color;
+use crate::basic::{Color, Shape};
 
 #[derive(Clone)]
 pub struct Image {
@@ -51,5 +51,13 @@ impl Image {
 
     pub fn get_pixel(&self, x: i32, y: i32) -> Color {
         self.data[(y * self.width + x) as usize]
+    }
+
+    pub fn fill_rect(&mut self, shape: Shape, color: Color) {
+        for y in shape.y1..shape.y2 {
+            for x in shape.x1..shape.x2 {
+                self.set_pixel(x, y, color);
+            }
+        }
     }
 }

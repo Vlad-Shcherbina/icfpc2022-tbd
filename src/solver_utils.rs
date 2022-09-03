@@ -2,6 +2,7 @@
 #![allow(clippy::needless_range_loop)]
 
 use std::collections::HashMap;
+use rand::prelude::*;
 
 use crate::{basic::{Color, Shape }, image::Image, util::project_path};
 
@@ -10,7 +11,7 @@ fn color_to_f64(c: &Color) -> [f64; 4] {
 }
 
 fn f64_to_color(c: &[f64; 4]) -> Color {
-    Color([c[0] as u8, c[1] as u8, c[2] as u8, c[3] as u8])
+    Color([c[0].round() as u8, c[1].round() as u8, c[2].round() as u8, c[3].round() as u8])
 }
 
 fn shape_distance(colors: &HashMap<Color, f64>, color: &Color) -> f64 {
@@ -43,21 +44,78 @@ fn gradient_step(colors: &HashMap<Color, f64>, color: &mut [f64; 4]) {
     }
 }
 
-pub fn optimal_color_for_block(pic: &Image, shape: &Shape) -> Color {
-    let k_step_num = 600;
+pub fn dist_to_color_freqs(color_freqs: &HashMap<Color, f64>, color: &Color) -> f64 {
+    let mut res = 0f64;
+    for (k, v) in color_freqs {
+        res += color.dist(k) * v;
+    }
+    res * 0.005
+}
+
+pub fn color_freqs(pic: &Image, shape: &Shape) -> HashMap<Color, f64> {
     let mut colors: HashMap<Color, f64> = HashMap::new();
     for x in shape.x1..shape.x2 {
         for y in shape.y1..shape.y2 {
             *colors.entry(pic.get_pixel(x, y)).or_default() += 1.0;
         }
     }
+    colors
+}
 
-    let color = pic.get_pixel(shape.x1, shape.y1);
+fn optimal_color_for_color_freqs(color_freqs: &HashMap<Color, f64>) -> Color {
+    let k_step_num = 600;
+    let color = Color::default();
     let mut color_array = color_to_f64(&color);
     for _ in 0..k_step_num {
-        gradient_step(&colors, &mut color_array);
+        gradient_step(color_freqs, &mut color_array);
     }
     f64_to_color(&color_array)
+}
+
+pub fn optimal_color_for_block(pic: &Image, shape: &Shape) -> Color {
+    let colors = color_freqs(pic, shape);
+    optimal_color_for_color_freqs(&colors)
+}
+
+pub fn best_from_palette(color_freqs: &HashMap<Color, f64>, palette: &[Color]) -> usize {
+    (0..palette.len()).min_by_key(
+        |&i| (1000.0 * dist_to_color_freqs(color_freqs, &palette[i])).round() as i64,
+    ).unwrap()
+}
+
+pub fn k_means(color_freqss: &[HashMap<Color, f64>], num_clusters: usize) -> Vec<Color> {
+    let mut centers = vec![];
+    for _ in 0..num_clusters {
+        centers.push(Color([
+            thread_rng().gen(),
+            thread_rng().gen(),
+            thread_rng().gen(),
+            thread_rng().gen(),
+        ]));
+    }
+
+    for _ in 0..50 {
+        let mut cluster_freqss: Vec<HashMap<Color, f64>> = vec![HashMap::new(); num_clusters];
+        for freqs in color_freqss {
+            let nearest = best_from_palette(freqs, &centers);
+            for (k, v) in freqs {
+                *cluster_freqss[nearest].entry(*k).or_default() += v;
+            }
+        }
+        for (i, cf) in cluster_freqss.iter().enumerate() {
+            if cf.is_empty() {
+                centers[i] = Color([
+                    thread_rng().gen(),
+                    thread_rng().gen(),
+                    thread_rng().gen(),
+                    thread_rng().gen(),
+                ]);
+            } else {
+                centers[i] = optimal_color_for_color_freqs(cf);
+            }
+        }
+    }
+    centers
 }
 
 crate::entry_point!("gradient", gradient);

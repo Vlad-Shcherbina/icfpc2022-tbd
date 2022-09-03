@@ -19,6 +19,7 @@ image = { version = "*", default-features = false, features = ["png"] }
 pico-args = { version = "*", features = ["eq-separator"] }
 rstats = "^1"
 base64 = "*"
+rand = "*"
 
 [profile.dev.package."*"]
 opt-level = "s"

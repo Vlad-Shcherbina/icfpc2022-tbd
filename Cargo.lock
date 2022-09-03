@@ -332,6 +332,7 @@ dependencies = [
  "once_cell",
  "pico-args",
  "postgres",
+ "rand",
  "rstats",
  "serde",
  "serde_json",
