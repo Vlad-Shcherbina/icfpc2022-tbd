@@ -171,7 +171,7 @@ fn solve(args: &SolverArgs, problem: &Problem) -> (i64, Vec<Move>) {
     //     eprintln!("{:?} {}", shape, color);
     // }
 
-    let mut painter = PainterState::new(&problem);
+    let mut painter = PainterState::new(problem);
     let mut all_moves = vec![];
     let mut root = BlockId::root(0);
     for (shape, color) in &rects {
