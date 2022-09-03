@@ -90,7 +90,13 @@ let currentBlocks = new Map<string,Block>();
 function render(blocks: Map<string, Block>) {
     currentBlocks = blocks;
     blocksCtx.clearRect(0,0,blocksCanvas.width, blocksCanvas.height);
-    blocksCtx.strokeStyle = "1px black";
+    if(blocksToggle.checked) {
+        blocksCtx.strokeStyle = "white";
+        blocksCtx.fillStyle = "white";
+    } else {
+        blocksCtx.strokeStyle = "black";
+        blocksCtx.fillStyle = "black";
+    }
     mainCtx.clearRect(0,0,mainCanvas.width, mainCanvas.height);
     for(const [k,v] of blocks.entries()) {
         mainCtx.drawImage(v.c, v.x, v.y);
@@ -405,6 +411,7 @@ blocksToggle.addEventListener('change', () => {
         mainCanvas.style.position = 'relative';
         blocksCanvas.style.position = 'relative';
     }
+    render(currentBlocks);
 })
 
 document.addEventListener('DOMContentLoaded', async () => {
