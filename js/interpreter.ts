@@ -159,7 +159,7 @@ mainCanvas.addEventListener('mousemove', (evt) => {
     const x = evt.clientX - rect.left;
     const y = rect.bottom - evt.clientY;
     const y_ = evt.clientY - rect.top;
-    const pixel = refCtx.getImageData(x, y_, 1, 1);
+    const pixel = mainCtx.getImageData(x, y_, 1, 1);
     const rgba = `[${pixel.data[0]}, ${pixel.data[1]}, ${pixel.data[2]}, ${pixel.data[3]}]`
     mainCanvas.title = `${Math.round(x)}, ${Math.round(y)}; ${rgba}`;
 });
@@ -189,10 +189,6 @@ run.addEventListener('click', () => {
         canvas.width = block.topRight[0] - block.bottomLeft[0]
         canvas.height = block.topRight[1] - block.bottomLeft[1]
         const ctx = canvas.getContext('2d')!;
-        // a hack to behave like the playground: pre-fill with white
-        ctx.fillStyle='rgba(255,255,255,1)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        // end hack
         ctx.fillStyle = `rgba(${block.color[0]}, ${block.color[1]}, ${block.color[2]}, ${block.color[3]/255.0})`;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         blocks.set(block.blockId, {x: block.bottomLeft[0], y: block.bottomLeft[1], c: canvas})
@@ -279,10 +275,7 @@ run.addEventListener('click', () => {
                     if (!blk) throw new Error(`No such block: ${cmd.block}`);
                     this_step_cost = cost_est(blk.c);
                     const ctx = blk.c.getContext('2d')!;
-                    // a hack to behave like the playground: pre-fill with white
-                    ctx.fillStyle='rgba(255,255,255,1)';
-                    ctx.fillRect(0, 0, blk.c.width, blk.c.height);
-                    // end hack
+                    ctx.clearRect(0, 0, blk.c.width, blk.c.height);
                     ctx.fillStyle = `rgba(${cmd.color[0]}, ${cmd.color[1]}, ${cmd.color[2]}, ${cmd.color[3]/255.0})`;
                     ctx.fillRect(0, 0, blk.c.width, blk.c.height);
                     break;
