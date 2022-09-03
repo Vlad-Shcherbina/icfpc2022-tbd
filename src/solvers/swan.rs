@@ -62,7 +62,7 @@ fn swan_solver() {
         let mut client = crate::db::create_client();
         let mut tx = client.transaction().unwrap();
         let incovation_id = record_this_invocation(&mut tx, Status::Stopped);
-        upload_solution(&mut tx, problem_id, &moves, "swan", &serde_json::to_value(&args).unwrap(), incovation_id);
+        upload_solution(&mut tx, problem_id, &moves, "swan", &serde_json::to_value(args).unwrap(), incovation_id);
         if dry_run {
             eprintln!("But not really, because it was a --dry-run!");
         } else {
