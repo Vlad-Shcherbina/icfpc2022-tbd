@@ -853,6 +853,13 @@ fn test_score_calculation() {
         merge [0.0] [0.1]
     ", 13, 217215, 217228);
 
+    // merge
+    check_score(1, "
+        color [0] [20, 50, 60, 90]
+        cut [0] [200, 200]
+        merge [0.0] [0.1]
+    ", 19, 217215, 217234);
+
     // initial color
     check_score(1, "", 0, 194616, 194616);
 
