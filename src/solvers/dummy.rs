@@ -29,7 +29,7 @@ fn dummy_solver() {
         &target, &Shape { x1: 0, y1: 0, x2: target.width, y2: target.height });
 
     let moves = vec![
-        Move::Color {
+        Move::ColorMove {
             block_id: BlockId::root(0),
             color,
         }

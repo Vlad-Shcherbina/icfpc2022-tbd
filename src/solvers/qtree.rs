@@ -80,7 +80,7 @@ impl State {
 
     fn qtree_stop_here_recolor_cost(&self, shape: Shape, block_id: BlockId) -> i64 {
         let mut state_copy = self.painter_state.clone();
-        let extra_cost = state_copy.apply_move(&Move::Color {
+        let extra_cost = state_copy.apply_move(&Move::ColorMove {
             block_id,
             color: self.average_color(shape),
         });
@@ -107,7 +107,7 @@ impl State {
 
         println!("In {} (aka block {}): repaint {}, no-op: {}, split: {}", shape, block_id, recolor_cost, no_recolor_cost, split_here);
         let (opt_moves, opt) = if no_recolor_cost > recolor_cost {
-            (vec![Move::Color { block_id: block_id.clone(), color: self.average_color(shape) }], recolor_cost)
+            (vec![Move::ColorMove { block_id: block_id.clone(), color: self.average_color(shape) }], recolor_cost)
         } else {
             (vec![], no_recolor_cost)
         };

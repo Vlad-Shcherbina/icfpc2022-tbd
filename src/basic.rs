@@ -63,7 +63,7 @@ pub enum Move {
         orientation: Orientation,
         line_number: i32,
     },
-    Color {
+    ColorMove {
         block_id: BlockId,
         color: Color,
     },
@@ -99,7 +99,7 @@ impl std::fmt::Display for Move {
                 };
                 write!(f, "cut [{}] [{}] [{}]", block_id, o, line_number)
             },
-            Move::Color {
+            ColorMove {
                 block_id,
                 color,
             } => write!(f, "color [{}] [{}, {}, {}, {}]", block_id, color.0[0], color.0[1], color.0[2], color.0[3]),  // TODO: use color as Display
@@ -144,7 +144,7 @@ impl Move {
                 it.next().unwrap().parse().unwrap(),
             ]);
             assert!(it.next().is_none());
-            return Move::Color {
+            return Move::ColorMove {
                 block_id,
                 color,
             };
@@ -228,9 +228,9 @@ fn test_string_to_move_and_back() {
 #[test]
 fn test_move_to_string() {
     let moves = vec![
-        Move::Color { block_id: BlockId::root(0), color: Color([146, 149, 120, 223]) },
+        Move::ColorMove { block_id: BlockId::root(0), color: Color([146, 149, 120, 223]) },
         Move::LCut { block_id: BlockId::root(0), orientation: Horizontal, line_number: 160 },
-        Move::Color { block_id: BlockId::root(0).child(1), color: Color([1, 2, 3, 4]) },
+        Move::ColorMove { block_id: BlockId::root(0).child(1), color: Color([1, 2, 3, 4]) },
     ];
 
     let mut res = String::new();
@@ -505,7 +505,7 @@ impl PainterState {
                 base_cost = 7;
                 block_size = block.shape.size();
             }
-            Move::Color { block_id, color } => {
+            Move::ColorMove { block_id, color } => {
                 let block = self.blocks.get_mut(block_id).unwrap();
                 actions.push(ColorBlock { block_id: block_id.clone(), old_block: block.clone() });
                 block.pieces = vec![(block.shape, *color)];
@@ -645,7 +645,7 @@ pub fn image_distance(img1: &Image, img2: &Image) -> f64 {
 crate::entry_point!("render_moves_example", render_moves_example);
 fn render_moves_example() {
     let moves = vec![
-        Move::Color {
+        Move::ColorMove {
             block_id: BlockId::root(0),
             color: Color([0, 74, 173, 255]),
         },
@@ -654,7 +654,7 @@ fn render_moves_example() {
             x: 360,
             y: 40
         },
-        Move::Color {
+        Move::ColorMove {
             block_id: BlockId::root(0).child(3),
             color: Color([128, 128, 128, 255]),
         },

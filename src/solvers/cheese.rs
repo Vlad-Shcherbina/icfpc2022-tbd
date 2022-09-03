@@ -59,10 +59,10 @@ impl State {
                     orientation: Orientation::Vertical,
                     line_number: x_end
                 });
-                self.moves.push(Move::Color { block_id: rest_block_id.child(0), color });
+                self.moves.push(Move::ColorMove { block_id: rest_block_id.child(0), color });
                 rest_block_id = rest_block_id.child(1);
             } else {
-                self.moves.push(Move::Color { block_id: rest_block_id.clone(), color });
+                self.moves.push(Move::ColorMove { block_id: rest_block_id.clone(), color });
             }
             x = x_end;
         }
