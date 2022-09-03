@@ -38,6 +38,13 @@ const referenceFile = document.getElementById("reference") as HTMLInputElement;
 const referenceSelector = document.getElementById("reference_select") as HTMLInputElement;
 const overlayToggle = document.getElementById("toggle_overlay") as HTMLInputElement;
 const heatmapColor = document.getElementById("heatmap_color")! as HTMLInputElement;
+const blocksToggle = document.getElementById("toggle_blocks_overlay") as HTMLInputElement;
+
+const blocksCanvas = document.getElementById("blocks_canvas") as HTMLCanvasElement;
+const blocksCtx = blocksCanvas.getContext('2d')!;
+blocksCtx.translate(0, blocksCanvas.height);
+blocksCtx.scale(1, -1);
+
 const parser = new Parser();
 
 function copyFrom(c: HTMLCanvasElement, sx: number, sy: number, sw: number, sh: number) {
@@ -78,12 +85,35 @@ const mainCanvas = document.getElementById("canvas") as HTMLCanvasElement;
 const mainCtx = mainCanvas.getContext("2d")!;
 mainCtx.translate(0, mainCanvas.height);
 mainCtx.scale(1, -1);
+let currentBlocks = new Map<string,Block>();
 
 function render(blocks: Map<string, Block>) {
-    for(const v of blocks.values()) {
+    currentBlocks = blocks;
+    blocksCtx.clearRect(0,0,blocksCanvas.width, blocksCanvas.height);
+    blocksCtx.strokeStyle = "1px black";
+    mainCtx.clearRect(0,0,mainCanvas.width, mainCanvas.height);
+    for(const [k,v] of blocks.entries()) {
         mainCtx.drawImage(v.c, v.x, v.y);
+        blocksCtx.strokeRect(v.x,v.y,v.c.width,v.c.height);
+        blocksCtx.save();
+        blocksCtx.scale(1, -1);
+        blocksCtx.fillText(k, v.x + 2 , - v.y - 2, v.c.width);
+        blocksCtx.restore();
     }
 }
+
+blocksCanvas.addEventListener('mousemove', (evt) => {
+    const rect = blocksCanvas.getBoundingClientRect();
+    const x = evt.clientX - rect.left;
+    const y = rect.bottom - evt.clientY;
+    console.log(x,y);
+    for(const [k,v] of currentBlocks.entries()) {
+        if (x >= v.x && x <= v.x + v.c.width && y >= v.y && y <= v.y + v.c.height) {
+            blocksCanvas.title = k;
+            break;
+        }
+    }
+})
 
 let currentIndex = 0;
 
@@ -366,6 +396,16 @@ function updateOverlayStyle() {
     }
     updateHash();
 }
+
+blocksToggle.addEventListener('change', () => {
+    if (blocksToggle.checked) {
+        mainCanvas.style.position = 'absolute';
+        blocksCanvas.style.position = 'absolute';
+    } else {
+        mainCanvas.style.position = 'relative';
+        blocksCanvas.style.position = 'relative';
+    }
+})
 
 document.addEventListener('DOMContentLoaded', async () => {
     referenceSelector.addEventListener('change', () => {
