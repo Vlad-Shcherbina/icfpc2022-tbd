@@ -184,6 +184,7 @@ struct SolutionsOpts {
     <th>moves cost</th>
     <th></th>
     <th>solver name</th>
+    <th>solver args</th>
     <th>inv.<th>
 </tr>
 </thead>
