@@ -67,7 +67,7 @@ pub fn handler(
       }).collect();
   // todo: add bads
   let s = SubmissionsTemplate {goods}.render().unwrap();
-  return resp.code("200 OK").body(s);
+  resp.code("200 OK").body(s)
 }
 
 struct GoodSubmission {
