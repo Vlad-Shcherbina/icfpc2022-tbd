@@ -10,6 +10,7 @@ mod solvers;
 mod image;
 mod uploader;
 mod solver_utils;
+mod seg_util;
 
 crate::entry_point!("hello", hello);
 fn hello() {

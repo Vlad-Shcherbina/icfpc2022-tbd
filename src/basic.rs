@@ -348,7 +348,10 @@ impl Shape {
                 ]
             }
         }
+    }
 
+    pub fn contains(&self, other: Shape) -> bool {
+        self.x1 <= other.x1 && other.x2 <= self.x2 && self.y1 <= other.y1 && other.y2 <= self.y2
     }
 
     pub(crate) fn from_image(img: &Image) -> Shape {
@@ -362,9 +365,9 @@ impl Shape {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct Block {
-    shape: Shape,
-    pieces: Vec<(Shape, Color)>,
+pub struct Block {
+    pub shape: Shape,
+    pub pieces: Vec<(Shape, Color)>,
 }
 
 impl Block {
@@ -425,7 +428,7 @@ pub struct PainterState {
     width: i32,
     height: i32,
     next_id: usize,
-    blocks: HashMap<BlockId, Block>,
+    pub blocks: HashMap<BlockId, Block>,
     pub(crate) cost: i64,
     history: Vec<Vec<PainterStateAction>>,
 }
