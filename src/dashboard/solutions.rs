@@ -89,7 +89,7 @@ pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: Respo
         let raw_row = client.query_one("SELECT problem_id, data, moves_cost, image_distance, invocation_id FROM solutions WHERE id = $1", &[&id]).unwrap();
         let problem_id: i32 = raw_row.get("problem_id");
         let moves_cost: i64 = raw_row.get("moves_cost");
-        let image_distance: i64 = raw_row.get("image_distance");
+        let image_dist: i64 = raw_row.get("image_distance");
         let invocation_id: i32 = raw_row.get("invocation_id");
 
         let inv_row = client.query_one("SELECT data FROM invocations WHERE id = $1", &[&invocation_id]).unwrap();
@@ -103,9 +103,18 @@ pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: Respo
         for m in &moves {
             painter.apply_move(m);
         }
-        assert_eq!(painter.cost, moves_cost);
+        // assert_eq!(painter.cost, moves_cost);
 
         let img = painter.render();
+
+        let dist = image_distance(&target, &img).round() as i64;
+        // assert_eq!(dist, image_dist);
+        if painter.cost != moves_cost || dist != image_dist {
+            let s = format!("Our current scorer ({} + {}) disagrees with the scores recorded in the DB ({} + {}).",
+                painter.cost, dist, moves_cost, image_dist);
+            return resp.code("200 OK").body(s);
+        }
+
         let path = project_path("cache/tmp.png");
         img.save(&path);
         let png = std::fs::read(&path).unwrap();
@@ -115,7 +124,7 @@ pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: Respo
             id,
             problem_id,
             moves_cost,
-            image_distance,
+            image_distance: image_dist,
             data,
             img_data_uri,
             invocation_id,
