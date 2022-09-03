@@ -1,8 +1,10 @@
+#![allow(unused_imports)]
+
 use crate::util::project_path;
 use crate::basic::*;
 use crate::image::Image;
-// use crate::invocation::{record_this_invocation, Status};
-// use crate::uploader::upload_solution;
+use crate::invocation::{record_this_invocation, Status};
+use crate::uploader::upload_solution;
 use crate::solver_utils::*;
 use crate::seg_util;
 
@@ -12,6 +14,10 @@ crate::entry_point!("swan_solver", swan_solver);
 fn swan_solver() {
     let mut pargs = pico_args::Arguments::from_vec(std::env::args_os().skip(2).collect());
     let problems: String = pargs.value_from_str("--problem").unwrap();
+    let dry_run = pargs.contains("--dry-run");
+    let rest = pargs.finish();
+    assert!(rest.is_empty(), "unrecognized arguments {:?}", rest);
+
     let problem_range = match problems.split_once("..") {
         Some((left, right)) => {
             let left: i32 = left.parse().unwrap();
@@ -68,7 +74,7 @@ fn swan_solver() {
                 approx_target.fill_rect(shape, palette[color_idx]);
             }
         }
-        approx_target.save(&project_path(format!("outputs/swan_{}_approx.png", problem_id)));
+        // approx_target.save(&project_path(format!("outputs/swan_{}_approx.png", problem_id)));
         dbg!(&color_cnts);
 
         let mut sorted_target = Image::new(problem.target.width, problem.target.height, Color::default());
@@ -87,7 +93,7 @@ fn swan_solver() {
                 qq += 1;
             }
         }
-        sorted_target.save(&project_path(format!("outputs/swan_{}_sorted.png", problem_id)));
+        // sorted_target.save(&project_path(format!("outputs/swan_{}_sorted.png", problem_id)));
         let mut rects: Vec<(Shape, Color)> = vec![];
         for i in 0..h {
             let mut color_idx = 0;
@@ -99,7 +105,7 @@ fn swan_solver() {
                     len += 1;
                 } else {
                     if len > 0 {
-                        eprintln!("i={}, j1={}, j2={}, color={}", i, j - len, j, palette[color_idx]);
+                        // eprintln!("i={}, j1={}, j2={}, color={}", i, j - len, j, palette[color_idx]);
                         rects.push((Shape {
                             x1: (j - len) * px,
                             y1: i * py,
@@ -113,7 +119,7 @@ fn swan_solver() {
             }
             if len > 0 {
                 let j = w;
-                eprintln!("i={}, j1={}, j2={}, color={}", i, j - len, j, palette[color_idx]);
+                // eprintln!("i={}, j1={}, j2={}, color={}", i, j - len, j, palette[color_idx]);
                 rects.push((Shape {
                     x1: (j - len) * px,
                     y1: i * py,
@@ -122,9 +128,9 @@ fn swan_solver() {
                 }, palette[color_idx]));
             }
         }
-        for (shape, color) in &rects {
-            eprintln!("{:?} {}", shape, color);
-        }
+        // for (shape, color) in &rects {
+        //     eprintln!("{:?} {}", shape, color);
+        // }
 
         let mut painter = PainterState::new(&problem);
         let mut all_moves = vec![];
@@ -141,16 +147,90 @@ fn swan_solver() {
             root = new_root;
         }
 
-        eprintln!("---");
-        for m in &all_moves {
-            eprintln!("{}", m);
-        }
-        eprintln!("---");
+        let mut cur_img = painter.render();
 
-        painter.render().save(&project_path(format!("outputs/swan_{}_yo.png", problem_id)));
+        loop {
+            let mut best_rank = 0;
+            let mut best_pair = ((-1, -1), (-1, -1));
+            for i1 in 0..h {
+                for j1 in 0..w {
+                    if approx_target.get_pixel(j1 * px, i1 * py) == cur_img.get_pixel(j1 * px, i1 * py) {
+                        continue;
+                    }
+                    for i2 in 0..h {
+                        for j2 in 0..w {
+                            if approx_target.get_pixel(j2 * px, i2 * py) == cur_img.get_pixel(j2 * px, i2 * py) {
+                                continue;
+                            }
+                            let mut rank = 0;
+                            if approx_target.get_pixel(j1 * px, i1 * py) == cur_img.get_pixel(j2 * px, i2 * py) {
+                                rank += 1;
+                            }
+                            if approx_target.get_pixel(j2 * px, i2 * py) == cur_img.get_pixel(j1 * px, i1 * py) {
+                                rank += 1;
+                            }
+                            if rank > best_rank {
+                                best_rank = rank;
+                                best_pair = ((i1, j1), (i2, j2));
+                            }
+                        }
+                    }
+                }
+            }
+            if best_rank == 0 {
+                break;
+            }
+            let ((i1, j1), (i2, j2)) = best_pair;
+            let c1 = cur_img.get_pixel(j1 * px, i1 * py);
+            let c2 = cur_img.get_pixel(j2 * px, i2 * py);
+            cur_img.set_pixel(j1 * px, i1 * py, c2);
+            cur_img.set_pixel(j2 * px, i2 * py, c1);
+
+            let shape1 = Shape {
+                x1: j1 * px,
+                y1: i1 * py,
+                x2: (j1 + 1) * px,
+                y2: (i1 + 1) * py,
+            };
+            let shape2 = Shape {
+                x1: j2 * px,
+                y1: i2 * py,
+                x2: (j2 + 1) * px,
+                y2: (i2 + 1) * py,
+            };
+            let id1 = painter.blocks.iter().find(|(_id, b)| b.shape.contains(shape1)).unwrap().0.clone();
+            let (id1, moves) = seg_util::isolate_rect(&mut painter, id1, shape1);
+            all_moves.extend(moves);
+
+            let id2 = painter.blocks.iter().find(|(_id, b)| b.shape.contains(shape2)).unwrap().0.clone();
+            let (id2, moves) = seg_util::isolate_rect(&mut painter, id2, shape2);
+            all_moves.extend(moves);
+
+            let m = Swap { block_id1: id1, block_id2: id2 };
+            painter.apply_move(&m);
+            all_moves.push(m);
+        }
+
+        // eprintln!("---");
+        // for m in &all_moves {
+        //     eprintln!("{}", m);
+        // }
+        // eprintln!("---");
+
+        let final_img = painter.render();
+        // final_img.save(&project_path(format!("outputs/swan_{}_yo.png", problem_id)));
+        let total_score = painter.cost + image_distance(&problem.target, &final_img).round() as i64;
+
+        dbg!(total_score);
+
+        let mut client = crate::db::create_client();
+        let mut tx = client.transaction().unwrap();
+        let incovation_id = record_this_invocation(&mut tx, Status::Stopped);
+        upload_solution(&mut tx, problem_id, &all_moves, "swan", &serde_json::Value::Null, incovation_id);
+        if dry_run {
+            eprintln!("But not really, because it was a --dry-run!");
+        } else {
+            tx.commit().unwrap();
+        }
     }
 }
-
-// fn isolate_rect(root: &mut BlockId, painter: &mut PainterState) -> Vec<Move> {
-
-// }
