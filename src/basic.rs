@@ -432,7 +432,7 @@ impl PainterState {
         let shape = Shape { x1: 0, y1: 0, x2: width, y2: height };
         blocks.insert(BlockId::root(0), Block {
             shape,
-            pieces: vec![(shape, Color([0, 0, 0, 0]))],
+            pieces: vec![(shape, Color([255, 255, 255, 255]))],
         });
         PainterState {
             width,
@@ -740,6 +740,9 @@ fn test_score_calculation() {
         cut [0] [x] [100]
         merge [0.0] [0.1]
     ", 13, 217215, 217228);
+
+    // initial color
+    check_score(1, "", 0, 194616, 194616);
 
     // Arsenij's manual solution
     check_score(1, "
