@@ -1,6 +1,6 @@
 use crate::basic::{Color, Shape};
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Image {
     pub width: i32,
     pub height: i32,

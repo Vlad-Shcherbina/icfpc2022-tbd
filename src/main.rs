@@ -12,6 +12,7 @@ mod uploader;
 mod solver_utils;
 mod seg_util;
 mod api;
+mod pack;
 
 crate::entry_point!("hello", hello);
 fn hello() {

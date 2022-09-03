@@ -99,6 +99,7 @@ fn solve(args: &SolverArgs, problem: &Problem) -> (i64, Vec<Move>) {
 
     let mut color_cnts = vec![0; palette.len()];
 
+    let mut mini_target = Image::new(w, h, Color::default());
     for i in 0..h {
         for j in 0..w {
             let shape = Shape {
@@ -111,65 +112,16 @@ fn solve(args: &SolverArgs, problem: &Problem) -> (i64, Vec<Move>) {
             let color_idx = best_from_palette(&color_freqs, &palette);
             color_cnts[color_idx] += 1;
             approx_target.fill_rect(shape, palette[color_idx]);
+            mini_target.set_pixel(j, i, palette[color_idx]);
         }
     }
-    // approx_target.save(&project_path(format!("outputs/swan_{}_approx.png", problem_id)));
-    // dbg!(&color_cnts);
-
-    let mut sorted_target = Image::new(problem.target.width, problem.target.height, Color::default());
-    let mut qq = 0;
-    for (color_idx, &cnt) in color_cnts.iter().enumerate() {
-        for _ in 0..cnt {
-            let i = qq / w;
-            let j = qq % w;
-            let shape = Shape {
-                x1: j * px,
-                y1: i * py,
-                x2: (j + 1) * px,
-                y2: (i + 1) * py,
-            };
-            sorted_target.fill_rect(shape, palette[color_idx]);
-            qq += 1;
-        }
+    let mut rects: Vec<(Shape, Color)> = crate::pack::packing(&mini_target);
+    for (shape, _color) in &mut rects {
+        shape.x1 *= px;
+        shape.y1 *= py;
+        shape.x2 *= px;
+        shape.y2 *= py;
     }
-    // sorted_target.save(&project_path(format!("outputs/swan_{}_sorted.png", problem_id)));
-    let mut rects: Vec<(Shape, Color)> = vec![];
-    for i in 0..h {
-        let mut color_idx = 0;
-        let mut len = 0;
-        for j in 0..w {
-            let c = sorted_target.get_pixel(j * px, i * py);
-            let ci = palette.iter().position(|&x| x == c).unwrap();
-            if ci == color_idx {
-                len += 1;
-            } else {
-                if len > 0 {
-                    // eprintln!("i={}, j1={}, j2={}, color={}", i, j - len, j, palette[color_idx]);
-                    rects.push((Shape {
-                        x1: (j - len) * px,
-                        y1: i * py,
-                        x2: j * px,
-                        y2: (i + 1) * py,
-                    }, palette[color_idx]));
-                }
-                color_idx = ci;
-                len = 1;
-            }
-        }
-        if len > 0 {
-            let j = w;
-            // eprintln!("i={}, j1={}, j2={}, color={}", i, j - len, j, palette[color_idx]);
-            rects.push((Shape {
-                x1: (j - len) * px,
-                y1: i * py,
-                x2: j * px,
-                y2: (i + 1) * py,
-            }, palette[color_idx]));
-        }
-    }
-    // for (shape, color) in &rects {
-    //     eprintln!("{:?} {}", shape, color);
-    // }
 
     let mut painter = PainterState::new(problem);
     let mut all_moves = vec![];
@@ -257,6 +209,7 @@ fn solve(args: &SolverArgs, problem: &Problem) -> (i64, Vec<Move>) {
     // eprintln!("---");
 
     let final_img = painter.render();
+    final_img.save(&project_path("outputs/swan_hz.png"));
     // final_img.save(&project_path(format!("outputs/swan_{}_yo.png", problem_id)));
     let total_score = painter.cost + image_distance(&problem.target, &final_img).round() as i64;
 
