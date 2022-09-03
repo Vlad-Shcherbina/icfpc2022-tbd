@@ -46,7 +46,7 @@ pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: Respo
             SELECT MIN ( s2.image_distance + s2.moves_cost )
             FROM solutions s2
             WHERE s1.problem_id = s2.problem_id
-        )
+        ) AND ($1 = -1 OR $1 = s1.problem_id)
         ORDER BY problem_id DESC
         ";
 
@@ -62,11 +62,13 @@ pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: Respo
             invocation_id,
             timestamp
         FROM solutions
+        WHERE $1 = -1 OR $1 = problem_id
         ";
 
         let mut query = best_query;
 
         let archive = req.query_args.remove("archive");
+        let problem_id: i32 = req.query_args.remove("problem_id").map_or(-1, |s| s.parse().unwrap());
 
         let archive = match archive {
             Some(x) => x == "true",
@@ -80,7 +82,7 @@ pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: Respo
 
         let opts = SolutionsOpts { archive };
 
-        let raw_rows = client.query(query, &[]).unwrap();
+        let raw_rows = client.query(query, &[&problem_id]).unwrap();
         let rows = raw_rows.into_iter().map(|row| {
             let id: i32 = row.get("id");
             let problem_id: i32 = row.get("problem_id");
@@ -123,7 +125,9 @@ struct SolutionsOpts {
 {% extends "base.html" %}
 {% block title %}sol/{% endblock %}
 {% block body %}
-<a href="?archive={{ !opts.archive }}">archive</a>
+
+<a href="?">best</a> |
+<a href="?archive={{ !opts.archive }}">archive (all)</a>
 <hr />
 <table>
 <thead>
@@ -133,7 +137,7 @@ struct SolutionsOpts {
     <tr>
         <td>{{ row.timestamp.format("%d %H:%M:%S").to_string() }}</td>
         <!-- {{ row.id }} -->
-        <td>#{{ row.problem_id }}</td>
+        <td><a href="/solution/?problem_id={{ row.problem_id }}&archive=true">#{{ row.problem_id }}</a></td>
         <td style="text-align: right">{{ row.score }}</td>
         <td> = </td>
         <td style="text-align: right">{{ row.image_distance }}</td>
