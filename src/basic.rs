@@ -343,7 +343,7 @@ impl Shape {
     }
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct Block {
     shape: Shape,
     pieces: Vec<(Shape, Color)>,
@@ -392,7 +392,7 @@ fn test_sub_block() {
     assert!(subblock == Block {shape: shape2.clone(), pieces: vec![(shape2.clone(), c.clone())]})
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum PainterStateAction {
     RemoveBlock { block_id: BlockId, removed_value: Block },
     AddBlock { block_id: BlockId },
@@ -402,7 +402,7 @@ enum PainterStateAction {
     SwapBlocks { block_id1: BlockId, block_id2: BlockId },
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PainterState {
     width: i32,
     height: i32,
@@ -677,6 +677,21 @@ fn test_split_merge() {
         line_number: 50,
     });
     painter.apply_move(&Merge { block_id1: BlockId::root(0).child(0), block_id2: BlockId::root(0).child(1) });
+}
+
+#[cfg(test)]
+#[test]
+fn test_rollback() {
+    let mut painter = PainterState::new(100, 100);
+    let painter_copy = painter.clone();
+    painter.apply_move(&LCut {
+        block_id: BlockId::root(0),
+        orientation: Orientation::Horizontal,
+        line_number: 50,
+    });
+    painter.rollback_move();
+    assert_eq!(painter, painter_copy);
+    // painter.apply_move(&Merge { block_id1: BlockId::root(0).child(0), block_id2: BlockId::root(0).child(1) });
 }
 
 
