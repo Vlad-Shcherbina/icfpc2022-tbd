@@ -39,18 +39,18 @@ fn geometric_median(img: &Image, shape: Shape) -> Color {
     }
     let median = colors.gmedian(0.5);
     //dbg!(median.clone());
-    for i in 0..3 {
-        if median[i].is_nan() {
+    for component in median.iter() {
+        if component.is_nan() {
             // Fallback to mean. I've no idea why the median algorithm fails sometimes.
             return mean(img,shape);
         }
     }
-    Color {0: [
+    Color ([
         median[0].round() as u8,
         median[1].round() as u8,
         median[2].round() as u8,
         median[3].round() as u8,
-    ]}
+    ])
 }
 
 impl State {
@@ -79,8 +79,8 @@ impl State {
     }
 
     fn average_color(&self, shape: Shape) -> Color {
-        return geometric_median(&self.img, shape);
-        //return mean(&self.img, shape);
+        geometric_median(&self.img, shape)
+        //mean(&self.img, shape)
     }
 
     fn qtree_stop_here_recolor_cost(&self, shape: Shape, block_id: BlockId) -> i32 {
