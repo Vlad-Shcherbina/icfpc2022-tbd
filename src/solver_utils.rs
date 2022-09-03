@@ -70,7 +70,7 @@ fn optimal_color_for_color_freqs(color_freqs: &HashMap<Color, f64>) -> Color {
     let color = Color::default();
     let mut color_array = color_to_f64(&color);
     let mut step_size: f64 = 100.0;
-    let mut last_color = color_array.clone();
+    let mut last_color = color_array;
     let mut last_dist = dist_to_color_freqs(color_freqs, &f64_to_color(&last_color));
     let mut cnt: i32 = 0;
     for _ in 0..K_STEP_NUM {

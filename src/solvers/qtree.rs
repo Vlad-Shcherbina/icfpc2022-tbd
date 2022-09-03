@@ -153,11 +153,8 @@ fn optimize_solution(moves: &[Move], width:i32, height: i32) -> Vec<Move> {
     let mut painter = PainterState::new(width, height);
     for m in moves {
         let ApplyMoveResult{cost, new_block_ids: _} = painter.apply_move(m);
-        match m {
-            Move::ColorMove { block_id: _, color } => {
+        if let Move::ColorMove { block_id: _, color } = m {
                 *color_costs.entry(color).or_insert(0) += cost;
-            }
-            _ => {}
         }
     }
 
