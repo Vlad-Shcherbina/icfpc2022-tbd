@@ -22,6 +22,7 @@ base64 = "*"
 rand = "*"
 ureq = { version = "*", features = ["json"] }
 multipart = "*"
+fxhash = "*"
 
 [profile.dev.package."*"]
 opt-level = "s"

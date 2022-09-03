@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 #![allow(clippy::needless_range_loop)]
 
-use std::collections::HashMap;
+use fxhash::FxHashMap as HashMap;
 use rand::prelude::*;
 use rstats::{VecVec};
 
@@ -58,7 +58,7 @@ pub fn dist_to_color_freqs(color_freqs: &HashMap<Color, f64>, color: &Color) -> 
 }
 
 pub fn color_freqs(pic: &Image, shape: &Shape) -> HashMap<Color, f64> {
-    let mut colors: HashMap<Color, f64> = HashMap::new();
+    let mut colors: HashMap<Color, f64> = HashMap::default();
     for x in shape.x1..shape.x2 {
         for y in shape.y1..shape.y2 {
             *colors.entry(pic.get_pixel(x, y)).or_default() += 1.0;
@@ -111,7 +111,7 @@ pub fn k_means(color_freqss: &[HashMap<Color, f64>], num_clusters: usize) -> Vec
     }
 
     for _ in 0..50 {
-        let mut cluster_freqss: Vec<HashMap<Color, f64>> = vec![HashMap::new(); num_clusters];
+        let mut cluster_freqss: Vec<HashMap<Color, f64>> = vec![HashMap::default(); num_clusters];
         for freqs in color_freqss {
             let nearest = best_from_palette(freqs, &centers);
             for (k, v) in freqs {
@@ -145,7 +145,7 @@ fn gradient() {
 
     let target = Image::load(&project_path(format!("data/problems/{}.png", problem_id)));
 
-    let mut colors: HashMap<Color, f64> = HashMap::new();
+    let mut colors: HashMap<Color, f64> = HashMap::default();
     for x in 0..target.width {
         for y in 0..target.height {
             *colors.entry(target.get_pixel(x, y)).or_default() += 1.0;
