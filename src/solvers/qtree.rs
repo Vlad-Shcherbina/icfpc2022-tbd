@@ -1,6 +1,5 @@
-use crate::util::project_path;
 use crate::image::Image;
-use crate::basic::{BlockId, Color, image_slice_distance, image_distance, Move, PainterState, Shape};
+use crate::basic::*;
 use crate::basic::Move::PCut;
 use crate::invocation::{record_this_invocation, Status};
 use crate::uploader::upload_solution;
@@ -12,11 +11,10 @@ struct State {
 }
 
 impl State {
-    fn new(img: Image) -> State {
-        let (width, height) = (img.width, img.height);
+    fn new(problem: &Problem) -> State {
         State {
-            img,
-            painter_state: PainterState::new(width, height),
+            img: problem.target.clone(),
+            painter_state: PainterState::new(problem),
         }
     }
 
@@ -111,11 +109,10 @@ fn qtree_solver() {
         std::process::exit(1);
     }
     let problem_id: i32 = args[0].parse().unwrap();
+    let problem = Problem::load(problem_id);
 
-    let target = Image::load(&project_path(format!("data/problems/{}.png", problem_id)));
-
-    let mut painter = PainterState::new(target.width, target.height);
-    let mut state = State::new(target.clone());
+    let mut painter = PainterState::new(&problem);
+    let mut state = State::new(&problem);
     let (moves, _cost) = state.solve();
 
     for m in &moves {
@@ -127,7 +124,7 @@ fn qtree_solver() {
 
     eprintln!();
     eprintln!("cost: {}", painter.cost);
-    let dist = image_distance(&img, &target);
+    let dist = image_distance(&img, &problem.target);
     eprintln!("distance to target: {}", dist);
     eprintln!("final score: {}", dist.round() as i64 + painter.cost);
 

@@ -8,9 +8,7 @@
 // (preferably ones that are easy to pronounce too).
 // Don't copy this comment when you copy the code.
 
-use crate::util::project_path;
 use crate::basic::*;
-use crate::image::Image;
 use crate::invocation::{record_this_invocation, Status};
 use crate::uploader::upload_solution;
 
@@ -22,11 +20,10 @@ fn dummy_solver() {
         std::process::exit(1);
     }
     let problem_id: i32 = args[0].parse().unwrap();
-
-    let target = Image::load(&project_path(format!("data/problems/{}.png", problem_id)));
+    let problem = Problem::load(problem_id);
 
     let color = crate::solver_utils::optimal_color_for_block(
-        &target, &Shape { x1: 0, y1: 0, x2: target.width, y2: target.height });
+        &problem.target, &Shape { x1: 0, y1: 0, x2: problem.target.width, y2: problem.target.height });
 
     let moves = vec![
         Move::ColorMove {
@@ -35,7 +32,7 @@ fn dummy_solver() {
         }
     ];
 
-    let mut painter = PainterState::new(target.width, target.height);
+    let mut painter = PainterState::new(&problem);
     for m in &moves {
         eprintln!("{}", m);
         painter.apply_move(m);
@@ -44,7 +41,7 @@ fn dummy_solver() {
     let img = painter.render();
     eprintln!();
     eprintln!("cost: {}", painter.cost);
-    let dist = image_distance(&img, &target);
+    let dist = image_distance(&img, &problem.target);
     eprintln!("distance to target: {}", dist);
     eprintln!("final score: {}", dist.round() as i64 + painter.cost);
 

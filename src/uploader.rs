@@ -1,7 +1,5 @@
 use std::fmt::Write;
 use crate::basic::*;
-use crate::image::Image;
-use crate::util::project_path;
 use crate::invocation::{record_this_invocation, Status};
 
 pub fn upload_solution(
@@ -12,9 +10,9 @@ pub fn upload_solution(
     solver_args: &serde_json::Value,
     invocation_id: i32,
 ) -> i32 {
-    let target = Image::load(&project_path(format!("data/problems/{}.png", problem_id)));
+    let problem = Problem::load(problem_id);
 
-    let mut painter = PainterState::new(target.width, target.height);
+    let mut painter = PainterState::new(&problem);
     let mut solution_text = String::new();
     for m in moves {
         painter.apply_move(m);
@@ -24,7 +22,7 @@ pub fn upload_solution(
     let moves_cost = painter.cost;
 
     let img = painter.render();
-    let dist = image_distance(&img, &target).round() as i64;
+    let dist = image_distance(&img, &problem.target).round() as i64;
 
     let row = tx.query_one("
     INSERT INTO solutions(problem_id, data, moves_cost, image_distance, solver, solver_args, invocation_id, timestamp)

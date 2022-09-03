@@ -4,6 +4,7 @@
 use std::collections::HashMap;
 use std::fmt::{Formatter, Write};
 use crate::image::Image;
+use crate::util::project_path;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash, PartialOrd, Ord)]
 pub struct Color(pub [u8; 4]);
@@ -36,6 +37,10 @@ impl BlockId {
         let mut res = self.clone();
         res.0.push(idx);
         res
+    }
+
+    pub fn parse(s: &str) -> BlockId {
+        BlockId(s.split('.').map(|p| p.parse().unwrap()).collect())
     }
 }
 
@@ -204,8 +209,7 @@ impl Move {
 fn strip_block_id(s: &str) -> (BlockId, &str) {
     let s = s.strip_prefix('[').unwrap();
     let (block_id, s) = s.split_once(']').unwrap();
-    let block_id = block_id.split('.').map(|p| p.parse().unwrap()).collect();
-    (BlockId(block_id), s)
+    (BlockId::parse(block_id), s)
 }
 
 fn roundtrip(s: &str) {
@@ -432,7 +436,7 @@ pub struct ApplyMoveResult {
 }
 
 impl PainterState {
-    pub fn new(width: i32, height: i32) -> Self {
+    /*pub fn new(width: i32, height: i32) -> Self {
         let mut blocks = HashMap::new();
         let shape = Shape { x1: 0, y1: 0, x2: width, y2: height };
         blocks.insert(BlockId::root(0), Block {
@@ -444,6 +448,20 @@ impl PainterState {
             height,
             next_id: 1,
             blocks,
+            cost: 0,
+            history: vec![],
+        }
+    }*/
+    pub fn new(p: &Problem) -> Self {
+        for (id, _b) in &p.start_blocks {
+            assert_eq!(id.0.len(), 1);
+        }
+        let next_id = p.start_blocks.iter().map(|(id, _)| id.0[0]).max().unwrap() + 1;
+        PainterState {
+            width: p.width,
+            height: p.height,
+            next_id,
+            blocks: p.start_blocks.iter().cloned().collect(),
             cost: 0,
             history: vec![],
         }
@@ -654,14 +672,88 @@ pub fn image_distance(img1: &Image, img2: &Image) -> f64 {
     image_slice_distance(img1, img2, Shape { x1: 0, y1: 0, x2: img1.width, y2: img1.height })
 }
 
+#[derive(serde::Deserialize)]
+#[derive(Debug)]
+struct InitialCanvas {
+    width: i32,
+    height: i32,
+    blocks: Vec<InitialBlock>,
+}
+
+#[derive(serde::Deserialize)]
+#[derive(Debug)]
+struct InitialBlock {
+    #[serde(rename = "blockId")]
+    block_id: String,
+    #[serde(rename = "bottomLeft")]
+    bottom_left: (i32, i32),
+    #[serde(rename = "topRight")]
+    top_right: (i32, i32),
+    color: [u8; 4],
+}
+
+pub struct Problem {
+    pub width: i32,
+    pub height: i32,
+    pub target: Image,
+    start_blocks: Vec<(BlockId, Block)>,
+}
+
+impl Problem {
+    pub fn load(problem_id: i32) -> Problem {
+        let target = Image::load(&project_path(format!("data/problems/{}.png", problem_id)));
+        let initial = project_path(format!("data/problems/{}.initial.json", problem_id));
+
+        let mut start_blocks: Vec<(BlockId, Block)> = vec![];
+
+        if initial.exists() {
+            let initial = std::fs::read_to_string(initial).unwrap();
+            let initial: InitialCanvas = serde_json::from_str(&initial).unwrap();
+            assert_eq!(target.width, initial.width);
+            assert_eq!(target.height, initial.height);
+            for b in initial.blocks {
+                let block_id = BlockId::parse(&b.block_id);
+                let color = Color(b.color);
+                let shape = Shape {
+                    x1: b.bottom_left.0,
+                    y1: b.bottom_left.1,
+                    x2: b.top_right.0,
+                    y2: b.top_right.1,
+                };
+                start_blocks.push((block_id, Block {
+                    shape,
+                    pieces: vec![(shape, color)],
+                }));
+            }
+        } else {
+            let shape = Shape { x1: 0, y1: 0, x2: target.width, y2: target.height };
+            start_blocks.push((BlockId::root(0), Block {
+                shape,
+                pieces: vec![(shape, Color([255, 255, 255, 255]))],
+            }));
+        }
+
+        Problem {
+            width: target.width,
+            height: target.height,
+            target,
+            start_blocks,
+        }
+    }
+}
+
 crate::entry_point!("render_moves_example", render_moves_example);
 fn render_moves_example() {
+    let problem = Problem::load(29);
+
+    // let qq = std::fs::read_to_string(format!("data/problems/problem_{}.json", problem_id)).unwrap();
+
     let moves = vec![
         Move::ColorMove {
             block_id: BlockId::root(0),
             color: Color([0, 74, 173, 255]),
         },
-        PCut {
+        /*PCut {
             block_id: BlockId::root(0),
             x: 360,
             y: 40
@@ -669,9 +761,9 @@ fn render_moves_example() {
         Move::ColorMove {
             block_id: BlockId::root(0).child(3),
             color: Color([128, 128, 128, 255]),
-        },
+        },*/
     ];
-    let mut painter = PainterState::new(400, 400);
+    let mut painter = PainterState::new(&problem);
     for m in &moves {
         eprintln!("{}", m);
         painter.apply_move(m);
@@ -681,10 +773,8 @@ fn render_moves_example() {
 
     let img = painter.render();
 
-    let target_path = "data/problems/1.png";
-    let target = Image::load(&crate::util::project_path(target_path));
-    let dist = image_distance(&img, &target);
-    eprintln!("distance to {} is {}", target_path, dist);
+    let dist = image_distance(&img, &problem.target);
+    eprintln!("distance: {}", dist);
     eprintln!("final score: {}", dist.round() as i64 + painter.cost);
 
     let path = "outputs/render_moves_example.png";
@@ -696,7 +786,8 @@ fn render_moves_example() {
 #[cfg(test)]
 #[test]
 fn test_split_merge() {
-    let mut painter = PainterState::new(100, 100);
+    let problem = Problem::load(1);
+    let mut painter = PainterState::new(&problem);
     painter.apply_move(&LCut {
         block_id: BlockId::root(0),
         orientation: Orientation::Horizontal,
@@ -708,7 +799,8 @@ fn test_split_merge() {
 #[cfg(test)]
 #[test]
 fn test_rollback() {
-    let mut painter = PainterState::new(100, 100);
+    let problem = Problem::load(1);
+    let mut painter = PainterState::new(&problem);
     let painter_copy = painter.clone();
     painter.apply_move(&LCut {
         block_id: BlockId::root(0),
@@ -724,14 +816,15 @@ fn test_rollback() {
 fn check_score(problem_id: i32, sol: &str, expected_cost: i64, expected_dist: i64, total_score: i64) {
     eprintln!("---");
     dbg!(problem_id);
-    let target = Image::load(&crate::util::project_path(&format!("data/problems/{}.png", problem_id)));
-    let mut painter = PainterState::new(target.width, target.height);
+
+    let problem = Problem::load(problem_id);
+    let mut painter = PainterState::new(&problem);
     let moves = Move::parse_many(sol);
     for m in &moves {
         painter.apply_move(m);
     }
     let img = painter.render();
-    let dist = image_distance(&img, &target).round() as i64;
+    let dist = image_distance(&img, &problem.target).round() as i64;
     dbg!(painter.cost);
     dbg!(dist);
     dbg!(painter.cost + dist);
@@ -744,6 +837,9 @@ fn check_score(problem_id: i32, sol: &str, expected_cost: i64, expected_dist: i6
 #[test]
 // Total score was compared with the official validator.
 fn test_score_calculation() {
+    // initial canvas
+    check_score(29, "color [0] [0, 74, 173, 255]", 500, 117035, 117535);
+
     check_score(1, "color [0] [20, 50, 60, 90]", 5, 217215, 217220);
 
     // merge

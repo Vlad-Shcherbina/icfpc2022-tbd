@@ -3,7 +3,6 @@ use askama::Template;
 use postgres::{types::Json};
 use crate::{util::DateTime, invocation::Invocation};
 use crate::basic::*;
-use crate::image::Image;
 use crate::util::project_path;
 
 use super::dev_server::{Request, ResponseBuilder, HandlerResult};
@@ -98,8 +97,8 @@ pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: Respo
         let data: String = raw_row.get("data");
         let moves = Move::parse_many(&data);
 
-        let target = Image::load(&project_path(format!("data/problems/{}.png", problem_id)));
-        let mut painter = PainterState::new(target.width, target.height);
+        let problem = Problem::load(problem_id);
+        let mut painter = PainterState::new(&problem);
         for m in &moves {
             painter.apply_move(m);
         }
@@ -107,7 +106,7 @@ pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: Respo
 
         let img = painter.render();
 
-        let dist = image_distance(&target, &img).round() as i64;
+        let dist = image_distance(&problem.target, &img).round() as i64;
         // assert_eq!(dist, image_dist);
         if painter.cost != moves_cost || dist != image_dist {
             let s = format!("Our current scorer ({} + {}) disagrees with the scores recorded in the DB ({} + {}).",

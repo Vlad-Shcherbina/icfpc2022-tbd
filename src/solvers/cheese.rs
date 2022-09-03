@@ -1,4 +1,3 @@
-use crate::util::project_path;
 use crate::basic::*;
 
 use crate::image::Image;
@@ -12,9 +11,9 @@ struct State {
 }
 
 impl State {
-    fn new(img: Image) -> State {
+    fn new(problem: &Problem) -> State {
         State {
-            img,
+            img: problem.target.clone(),
             moves: vec![],
         }
     }
@@ -99,12 +98,12 @@ fn cheese_solver() {
         std::process::exit(1);
     }
     let problem_id: i32 = args[0].parse().unwrap();
+    let problem = Problem::load(problem_id);
 
-    let target = Image::load(&project_path(format!("data/problems/{}.png", problem_id)));
-    let mut state = State::new(target.clone());
+    let mut state = State::new(&problem);
     state.solve();
 
-    let mut painter = PainterState::new(target.width as i32, target.height as i32);
+    let mut painter = PainterState::new(&problem);
     for m in &state.moves {
         eprintln!("{}", m);
         painter.apply_move(m);
@@ -113,7 +112,7 @@ fn cheese_solver() {
     let img = painter.render();
     eprintln!();
     eprintln!("cost: {}", painter.cost);
-    let dist = image_distance(&img, &target);
+    let dist = image_distance(&img, &problem.target);
     eprintln!("distance to target: {}", dist);
     eprintln!("final score: {}", dist.round() as i64 + painter.cost);
 

@@ -25,18 +25,18 @@ fn swan_solver() {
     dbg!(&problem_range);
     for problem_id in problem_range {
         eprintln!("*********** problem {} ***********", problem_id);
-        let target = Image::load(&project_path(format!("data/problems/{}.png", problem_id)));
+        let problem = Problem::load(problem_id);
 
         let px = 40;
         let py = 40;
 
-        let w = target.width / px;
-        let h = target.height / py;
+        let w = problem.target.width / px;
+        let h = problem.target.height / py;
 
         let mut color_freqss = vec![];
         for i in 0..h {
             for j in 0..w {
-                let color_freqs = color_freqs(&target, &Shape {
+                let color_freqs = color_freqs(&problem.target, &Shape {
                     x1: j * px,
                     y1: i * py,
                     x2: (j + 1) * px,
@@ -49,7 +49,7 @@ fn swan_solver() {
         let mut palette = k_means(&color_freqss, 3);
         palette.sort();
 
-        let mut approx_target = Image::new(target.width, target.height, Color::default());
+        let mut approx_target = Image::new(problem.target.width, problem.target.height, Color::default());
 
         let mut color_cnts = vec![0; palette.len()];
 
@@ -61,7 +61,7 @@ fn swan_solver() {
                     x2: (j + 1) * px,
                     y2: (i + 1) * py,
                 };
-                let color_freqs = color_freqs(&target, &shape);
+                let color_freqs = color_freqs(&problem.target, &shape);
                 let color_idx = best_from_palette(&color_freqs, &palette);
                 color_cnts[color_idx] += 1;
                 approx_target.fill_rect(shape, palette[color_idx]);
@@ -70,7 +70,7 @@ fn swan_solver() {
         approx_target.save(&project_path(format!("outputs/swan_{}_approx.png", problem_id)));
         dbg!(&color_cnts);
 
-        let mut sorted_target = Image::new(target.width, target.height, Color::default());
+        let mut sorted_target = Image::new(problem.target.width, problem.target.height, Color::default());
         let mut qq = 0;
         for (color_idx, &cnt) in color_cnts.iter().enumerate() {
             for _ in 0..cnt {
@@ -125,7 +125,7 @@ fn swan_solver() {
             eprintln!("{:?} {}", shape, color);
         }
 
-        let mut painter = PainterState::new(target.width, target.height);
+        let mut painter = PainterState::new(&problem);
         let mut moves = vec![];
         let mut root = BlockId::root(0);
         for (shape, color) in &rects {
