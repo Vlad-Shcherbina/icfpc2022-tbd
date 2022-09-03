@@ -219,12 +219,12 @@ struct SolutionsTemplate {
 {% block body %}
 <p>{{ inv_data|render_invocation_ref(invocation_id)|safe }}</p>
 <p>Score: {{ moves_cost + image_distance }} = {{ image_distance }} + {{ moves_cost }}</p>
+<p><a id="run_in_interpreter">Run in visualizer</a></p>
 <p>
     <img src="{{ img_data_uri }}"/>
     <img src="/data/problems/{{ problem_id }}.png"/>
 </p>
 <pre>{{ data }}</pre>
-<a id="run_in_interpreter">Run in visualizer</a>
 <script>
 (function (){
 const a = document.getElementById("run_in_interpreter");
