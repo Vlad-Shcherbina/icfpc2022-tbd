@@ -10,6 +10,13 @@ use crate::seg_util;
 
 use crate::basic::Move::*;
 
+#[derive(serde::Serialize)]
+struct SolverArgs {
+    px: i32,
+    py: i32,
+    num_colors: usize,
+}
+
 crate::entry_point!("swan_solver", swan_solver);
 fn swan_solver() {
     let mut pargs = pico_args::Arguments::from_vec(std::env::args_os().skip(2).collect());
@@ -34,6 +41,7 @@ fn swan_solver() {
         eprintln!("*********** problem {} ***********", problem_id);
         let problem = Problem::load(problem_id);
 
+        let num_colors = 3;
         let px = 40;
         let py = 40;
 
@@ -53,7 +61,7 @@ fn swan_solver() {
             }
         }
 
-        let mut palette = k_means(&color_freqss, 3);
+        let mut palette = k_means(&color_freqss, num_colors);
         palette.sort();
 
         let mut approx_target = Image::new(problem.target.width, problem.target.height, Color::default());
@@ -226,7 +234,10 @@ fn swan_solver() {
         let mut client = crate::db::create_client();
         let mut tx = client.transaction().unwrap();
         let incovation_id = record_this_invocation(&mut tx, Status::Stopped);
-        upload_solution(&mut tx, problem_id, &all_moves, "swan", &serde_json::Value::Null, incovation_id);
+        let args = SolverArgs {
+            px, py, num_colors,
+        };
+        upload_solution(&mut tx, problem_id, &all_moves, "swan", &serde_json::to_value(&args).unwrap(), incovation_id);
         if dry_run {
             eprintln!("But not really, because it was a --dry-run!");
         } else {

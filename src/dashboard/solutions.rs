@@ -74,10 +74,12 @@ pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: Respo
             let image_distance: i64 = row.get("image_distance");
             let score: i64 = moves_cost + image_distance;
             let solver_name: String = row.get("solver");
-            let solver_args: Json<Option<Vec<String>>> = row.get("solver_args");
+            let solver_args: Json<serde_json::Value> = row.get("solver_args");
             let invocation_id: i32 = row.get("invocation_id");
             let timestamp: DateTime = row.get("timestamp");
-            SolutionRow { id, problem_id, /* data, */ moves_cost, image_distance, score, solver_name, solver_args: solver_args.0, invocation_id, timestamp }
+
+            let solver_args = serde_json::to_string(&solver_args.0).unwrap();
+            SolutionRow { id, problem_id, /* data, */ moves_cost, image_distance, score, solver_name, solver_args, invocation_id, timestamp }
         }).collect();
         let s = SolutionsTemplate {opts, rows}.render().unwrap();
         return resp.code("200 OK").body(s);
@@ -152,7 +154,7 @@ struct SolutionRow {
     image_distance: i64,
     score: i64,
     solver_name: String,
-    solver_args: Option<Vec<String>>,
+    solver_args: String,
     invocation_id: i32,
     timestamp: DateTime
 }
@@ -198,7 +200,7 @@ struct SolutionsOpts {
         <td>{{ row.moves_cost }}</td>
         <td><a href="/solution/{{ row.id }}">sol/{{ row.id }}</a></td>
         <td>{{ row.solver_name }}</td>
-        <td>[ {% for arg in row.solver_args %} arg {% endfor %} ]</td>
+        <td>{{ row.solver_args }}</td>
         <td><a href="/invocation/{{ row.invocation_id }}">inv/{{ row.invocation_id }}</a></td>
     </tr>
 {% endfor %}
