@@ -145,7 +145,7 @@ struct SolutionsOpts {
         <td>{{ row.moves_cost }}</td>
         <td>{{ row.solver_name }}</td>
         <td>[ {% for arg in row.solver_args %} arg {% endfor %} ]</td>
-        <td>{{ row.invocation_id }}</td>
+        <td><a href="/invocation/{{ row.invocation_id }}">inv/{{ row.invocation_id }}</a></td>
     </tr>
 {% endfor %}
 </table>
