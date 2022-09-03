@@ -55,6 +55,9 @@ fn upload_solution_ep() {
         if line.is_empty() {
             continue;
         }
+        if line.starts_with('#') {
+            continue;
+        }
         moves.push(Move::parse(line));
     }
 
