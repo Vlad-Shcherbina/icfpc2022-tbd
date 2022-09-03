@@ -116,6 +116,20 @@ impl std::fmt::Display for Move {
 }
 
 impl Move {
+    pub fn parse_many(s: &str) -> Vec<Move> {
+        let mut moves = vec![];
+        for line in s.split_terminator('\n') {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+            if line.starts_with('#') {
+                continue;
+            }
+            moves.push(Move::parse(line));
+        }
+        moves
+    }
     pub fn parse(s: &str) -> Move {
         let s = s.replace(' ', "");
         if let Some(s) = s.strip_prefix("color") {

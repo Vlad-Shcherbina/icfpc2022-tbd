@@ -49,17 +49,7 @@ fn upload_solution_ep() {
     assert!(rest.is_empty(), "unrecognized arguments {:?}", rest);
 
     let solution_text = std::fs::read_to_string(solution_path).unwrap();
-    let mut moves = vec![];
-    for line in solution_text.split_terminator('\n') {
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
-        }
-        if line.starts_with('#') {
-            continue;
-        }
-        moves.push(Move::parse(line));
-    }
+    let moves = Move::parse_many(&solution_text);
 
     let mut client = crate::db::create_client();
     let mut tx = client.transaction().unwrap();

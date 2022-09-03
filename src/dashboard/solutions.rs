@@ -2,6 +2,9 @@
 use askama::Template;
 use postgres::{types::Json};
 use crate::{util::DateTime, invocation::Invocation};
+use crate::basic::*;
+use crate::image::Image;
+use crate::util::project_path;
 
 use super::dev_server::{Request, ResponseBuilder, HandlerResult};
 // use crate::invocation::Invocation;
@@ -93,12 +96,44 @@ pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: Respo
         let postgres::types::Json(inv_data) = inv_row.get("data");
 
         let data: String = raw_row.get("data");
+        let moves = Move::parse_many(&data);
 
-        let s = SolutionTemplate { id, problem_id, moves_cost, image_distance, data, invocation_id, inv_data }.render().unwrap();
+        let target = Image::load(&project_path(format!("data/problems/{}.png", problem_id)));
+        let mut painter = PainterState::new(target.width, target.height);
+        for m in &moves {
+            painter.apply_move(m);
+        }
+        assert_eq!(painter.cost as i64, moves_cost);
+
+        let img = painter.render();
+        let path = project_path("cache/tmp.png");
+        img.save(&path);
+        let png = std::fs::read(&path).unwrap();
+        let img_data_uri = data_uri(&png, "image/png");
+
+        let s = SolutionTemplate {
+            id,
+            problem_id,
+            moves_cost,
+            image_distance,
+            data,
+            img_data_uri,
+            invocation_id,
+            inv_data,
+        }.render().unwrap();
         return resp.code("200 OK").body(s);
     }
 
     resp.code("404 Not Found").body("not found")
+}
+
+fn data_uri(data: &[u8], mime_type: &str) -> String {
+    let mut s = String::new();
+    s.push_str("data:");
+    s.push_str(mime_type);
+    s.push_str(";base64,");
+    s.push_str(&base64::encode(data));
+    s
 }
 
 struct SolutionRow {
@@ -174,7 +209,10 @@ struct SolutionsTemplate {
 {% block body %}
 <p>{{ inv_data|render_invocation_ref(invocation_id)|safe }}</p>
 <p>Score: {{ moves_cost + image_distance }} = {{ image_distance }} + {{ moves_cost }}</p>
-<p>Target: <img src="/data/problems/{{ problem_id }}.png"></img></p>
+<p>
+    <img src="{{ img_data_uri }}"/>
+    <img src="/data/problems/{{ problem_id }}.png"/>
+</p>
 <pre>{{ data }}</pre>
 {% endblock %}
 "#)]
@@ -184,6 +222,7 @@ struct SolutionTemplate {
     moves_cost: i64,
     image_distance: i64,
     data: String,
+    img_data_uri: String,
     invocation_id: i32,
     inv_data: Invocation,
 }

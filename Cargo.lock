@@ -325,6 +325,7 @@ name = "icfpc2022-tbd"
 version = "0.1.0"
 dependencies = [
  "askama",
+ "base64",
  "chrono",
  "image",
  "linkme",
