@@ -104,7 +104,7 @@ struct InvocationRow {
     data: Invocation,
 }
 
-mod filters {
+pub mod filters {
     use super::*;
 
     pub fn render_invocation_ref(inv: &Invocation, id: &i32) -> askama::Result<String> {
