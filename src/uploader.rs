@@ -45,6 +45,7 @@ fn upload_solution_ep() {
     let problem_id: i32 = pargs.value_from_str("--problem").unwrap();
     let solution_path: String = pargs.value_from_str("--solution").unwrap();
     let solver_name: String = pargs.value_from_str("--solver").unwrap();
+    let dry_run = pargs.contains("--dry-run");
     let rest = pargs.finish();
     assert!(rest.is_empty(), "unrecognized arguments {:?}", rest);
 
@@ -55,5 +56,9 @@ fn upload_solution_ep() {
     let mut tx = client.transaction().unwrap();
     let incovation_id = record_this_invocation(&mut tx, Status::Stopped);
     upload_solution(&mut tx, problem_id, &moves, &solver_name, &serde_json::Value::Null, incovation_id);
-    tx.commit().unwrap();
+    if dry_run {
+        eprintln!("But not really, because it was a --dry-run!");
+    } else {
+        tx.commit().unwrap();
+    }
 }
