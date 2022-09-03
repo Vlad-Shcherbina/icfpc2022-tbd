@@ -1,8 +1,10 @@
 // use std::time::SystemTime;
+use std::collections::HashMap;
 use askama::Template;
 use postgres::types::Json;
 use crate::{util::DateTime, invocation::Invocation};
 use crate::basic::*;
+use crate::basic::Move::*;
 use crate::util::project_path;
 
 use super::dev_server::{Request, ResponseBuilder, HandlerResult};
@@ -101,8 +103,27 @@ pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: Respo
 
         let problem = Problem::load(problem_id);
         let mut painter = PainterState::new(&problem);
+
+        let mut cost_breakdown: HashMap<&'static str, i64> = HashMap::new();
         for m in &moves {
-            painter.apply_move(m);
+            let c = painter.apply_move(m).cost;
+            match m {
+                ColorMove { .. } => {
+                    *cost_breakdown.entry("color").or_default() += c;
+                }
+                LCut { .. } => {
+                    *cost_breakdown.entry("lcut").or_default() += c;
+                }
+                PCut { .. } => {
+                    *cost_breakdown.entry("pcut").or_default() += c;
+                }
+                Merge { .. } => {
+                    *cost_breakdown.entry("merge").or_default() += c;
+                }
+                Swap { .. } => {
+                    *cost_breakdown.entry("swap").or_default() += c;
+                }
+            }
         }
         // assert_eq!(painter.cost, moves_cost);
 
@@ -125,6 +146,7 @@ pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: Respo
             id,
             problem_id,
             moves_cost,
+            cost_breakdown,
             image_distance: image_dist,
             data,
             img_data_uri,
@@ -219,6 +241,7 @@ struct SolutionsTemplate {
 {% block body %}
 <p>{{ inv_data|render_invocation_ref(invocation_id)|safe }}</p>
 <p>Score: {{ moves_cost + image_distance }} = {{ image_distance }} + {{ moves_cost }}</p>
+<p>Move cost breakdown: {{ "{:?}"|format(cost_breakdown) }} </p>
 <p><a id="run_in_interpreter">Run in visualizer</a></p>
 <p>
     <img src="{{ img_data_uri }}"/>
@@ -241,6 +264,7 @@ struct SolutionTemplate {
     id: i32,
     problem_id: i32,
     moves_cost: i64,
+    cost_breakdown: HashMap<&'static str, i64>,
     image_distance: i64,
     data: String,
     img_data_uri: String,
