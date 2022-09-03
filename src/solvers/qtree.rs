@@ -5,6 +5,7 @@ use crate::basic::Move::PCut;
 use crate::invocation::{record_this_invocation, Status};
 use crate::uploader::upload_solution;
 use rstats::{VecVec};
+use std::collections::HashMap;
 
 struct State {
     img: Image,
@@ -145,6 +146,43 @@ impl State {
     }
 }
 
+fn optimize_solution(moves: &[Move], width:i32, height: i32) -> Vec<Move> {
+    // Pre-fill the most popular color.
+    let mut color_costs = HashMap::new();
+
+    let mut painter = PainterState::new(width, height);
+    for m in moves {
+        let cost = painter.apply_move(m);
+        match m {
+            Move::Color { block_id: _, color } => {
+                *color_costs.entry(color).or_insert(0) += cost;
+            }
+            _ => {}
+        }
+    }
+
+    let max_cost_color = color_costs.iter().max_by_key(|(_k, v)| *v).unwrap().0;
+    let mut optimized_moves = vec![];
+    optimized_moves.push(Move::Color {
+        block_id: BlockId::root(0),
+        color: **max_cost_color,
+    });
+
+    // Don't paint that color in smaller blocks.
+    for m in moves {
+        match m {
+            Move::Color { block_id: _, color } => {
+                if color != *max_cost_color {
+                    optimized_moves.push(m.clone());
+                }
+            }
+            _ => {optimized_moves.push(m.clone());}
+        }
+    }
+
+    optimized_moves
+}
+
 crate::entry_point!("qtree_solver", qtree_solver);
 fn qtree_solver() {
     let args: Vec<String> = std::env::args().skip(2).collect();
@@ -173,6 +211,21 @@ fn qtree_solver() {
     eprintln!("distance to target: {}", dist);
     eprintln!("final score: {}", dist.round() as i64 + painter.cost);
 
+    eprintln!("optimizing");
+    let optimized_moves = optimize_solution(&moves, target.width, target.height);
+    painter = PainterState::new(target.width, target.height);
+    for m in &optimized_moves {
+        eprintln!("{}", m);
+        painter.apply_move(m);
+    }
+    let img = painter.render();
+    eprintln!();
+    eprintln!("cost: {}", painter.cost);
+    let dist = image_distance(&img, &target);
+    eprintln!("distance to target: {}", dist);
+    eprintln!("final score: {}", dist.round() as i32 + painter.cost);
+
+
     let output_path = format!("outputs/qtree_{}.png", problem_id);
     img.save(&crate::util::project_path(&output_path));
     eprintln!("saved to {}", output_path);
@@ -180,6 +233,6 @@ fn qtree_solver() {
     let mut client = crate::db::create_client();
     let mut tx = client.transaction().unwrap();
     let incovation_id = record_this_invocation(&mut tx, Status::Stopped);
-    upload_solution(&mut tx, problem_id, &moves, "qtree", &serde_json::Value::Null, incovation_id);
+    upload_solution(&mut tx, problem_id, &optimized_moves, "qtree", &serde_json::Value::Null, incovation_id);
     tx.commit().unwrap();
 }
