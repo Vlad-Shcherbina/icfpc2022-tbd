@@ -126,6 +126,9 @@ struct SolutionsOpts {
 <a href="?archive={{ !opts.archive }}">archive</a>
 <hr />
 <table>
+<thead>
+<th>timestamp</th><th>pr.</th><th>score</th><th></th><th>image dist.</th><th></th><th>moves cost</th><th>solver name</th><th>solver args</th><th>inv.<th>
+</thead>
 {% for row in rows %}
     <tr>
         <td>{{ row.timestamp.format("%d %H:%M:%S").to_string() }}</td>
