@@ -21,7 +21,7 @@ pub fn upload_solution(
         writeln!(solution_text, "{}", m).unwrap();
     }
 
-    let moves_cost = painter.cost as i64;
+    let moves_cost = painter.cost;
 
     let img = painter.render();
     let dist = image_distance(&img, &target).round() as i64;
@@ -34,7 +34,7 @@ pub fn upload_solution(
     let id: i32 = row.get(0);
 
     eprintln!("Uploading solution for problem {}, cost={}, dist={}, total={} (solution/{})",
-        problem_id, moves_cost, dist, moves_cost as i64 + dist, id);
+        problem_id, moves_cost, dist, moves_cost + dist, id);
 
     id
 }

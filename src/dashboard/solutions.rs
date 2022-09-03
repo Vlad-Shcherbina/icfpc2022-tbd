@@ -103,7 +103,7 @@ pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: Respo
         for m in &moves {
             painter.apply_move(m);
         }
-        assert_eq!(painter.cost as i64, moves_cost);
+        assert_eq!(painter.cost, moves_cost);
 
         let img = painter.render();
         let path = project_path("cache/tmp.png");

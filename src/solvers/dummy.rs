@@ -46,7 +46,7 @@ fn dummy_solver() {
     eprintln!("cost: {}", painter.cost);
     let dist = image_distance(&img, &target);
     eprintln!("distance to target: {}", dist);
-    eprintln!("final score: {}", dist.round() as i32 + painter.cost);
+    eprintln!("final score: {}", dist.round() as i64 + painter.cost);
 
     let output_path = format!("outputs/dummy_{}.png", problem_id);
     img.save(&crate::util::project_path(&output_path));

@@ -411,7 +411,7 @@ enum PainterStateAction {
     RemoveBlock { block_id: BlockId, removed_value: Block },
     AddBlock { block_id: BlockId },
     IncrementNextId,
-    IncrementCost { added_cost: i32 },
+    IncrementCost { added_cost: i64 },
     ColorBlock { block_id: BlockId, old_block: Block },
     SwapBlocks { block_id1: BlockId, block_id2: BlockId },
 }
@@ -422,7 +422,7 @@ pub struct PainterState {
     height: i32,
     next_id: usize,
     blocks: HashMap<BlockId, Block>,
-    pub(crate) cost: i32,
+    pub(crate) cost: i64,
     history: Vec<Vec<PainterStateAction>>,
 }
 
@@ -476,7 +476,7 @@ impl PainterState {
     }
 
     // Returns the cost of the applied move
-    pub fn apply_move(&mut self, m: &Move) -> i32 {
+    pub fn apply_move(&mut self, m: &Move) -> i64 {
         let base_cost;
         let block_size;
         let mut actions = vec![];
@@ -543,7 +543,7 @@ impl PainterState {
                 self.next_id += 1;
             }
         }
-        let extra_cost = (base_cost * self.width * self.height + (block_size + 1)/2) / block_size;
+        let extra_cost = ((base_cost * self.width * self.height + (block_size + 1)/2) / block_size) as i64;
         self.cost += extra_cost;
         actions.push(IncrementCost { added_cost: extra_cost });
         self.history.push(actions);
@@ -673,7 +673,7 @@ fn render_moves_example() {
     let target = Image::load(&crate::util::project_path(target_path));
     let dist = image_distance(&img, &target);
     eprintln!("distance to {} is {}", target_path, dist);
-    eprintln!("final score: {}", dist.round() as i32 + painter.cost);
+    eprintln!("final score: {}", dist.round() as i64 + painter.cost);
 
     let path = "outputs/render_moves_example.png";
     img.save(&crate::util::project_path(path));

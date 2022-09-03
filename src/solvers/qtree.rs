@@ -62,12 +62,12 @@ impl State {
         }
     }
 
-    fn potential_gain(&self, painter_state: &PainterState, shape: Shape) -> i32 {
+    fn potential_gain(&self, painter_state: &PainterState, shape: Shape) -> i64 {
         let img = painter_state.render();
-        image_slice_distance(&self.img, &img, shape) as i32
+        image_slice_distance(&self.img, &img, shape).round() as i64
     }
 
-    fn solve(&mut self) -> (Vec<Move>, i32) {
+    fn solve(&mut self) -> (Vec<Move>, i64) {
         let shape = Shape {x1: 0, y1: 0, x2: self.img.width as i32, y2: self.img.height as i32 };
         let block = BlockId::root(0);
         self.qtree(shape, block)
@@ -78,7 +78,7 @@ impl State {
         //mean(&self.img, shape)
     }
 
-    fn qtree_stop_here_recolor_cost(&self, shape: Shape, block_id: BlockId) -> i32 {
+    fn qtree_stop_here_recolor_cost(&self, shape: Shape, block_id: BlockId) -> i64 {
         let mut state_copy = self.painter_state.clone();
         let extra_cost = state_copy.apply_move(&Move::Color {
             block_id,
@@ -87,11 +87,11 @@ impl State {
         extra_cost + self.potential_gain(&state_copy, shape)
     }
 
-    fn qtree_stop_here_no_recolor_cost(&self, shape: Shape) -> i32 {
+    fn qtree_stop_here_no_recolor_cost(&self, shape: Shape) -> i64 {
         self.potential_gain(&self.painter_state, shape)
     }
 
-    fn split_here_cost(&self, shape: Shape, block_id: BlockId) -> i32 {
+    fn split_here_cost(&self, shape: Shape, block_id: BlockId) -> i64 {
         let mut state_copy = self.painter_state.clone();
         state_copy.apply_move(&PCut {
             block_id,
@@ -100,7 +100,7 @@ impl State {
         })
     }
 
-    fn qtree(&mut self, shape: Shape, block_id: BlockId) -> (Vec<Move>, i32) {
+    fn qtree(&mut self, shape: Shape, block_id: BlockId) -> (Vec<Move>, i64) {
         let split_here = self.split_here_cost(shape, block_id.clone());
         let recolor_cost = self.qtree_stop_here_recolor_cost(shape, block_id.clone());
         let no_recolor_cost = self.qtree_stop_here_no_recolor_cost(shape);
@@ -171,7 +171,7 @@ fn qtree_solver() {
     eprintln!("cost: {}", painter.cost);
     let dist = image_distance(&img, &target);
     eprintln!("distance to target: {}", dist);
-    eprintln!("final score: {}", dist.round() as i32 + painter.cost);
+    eprintln!("final score: {}", dist.round() as i64 + painter.cost);
 
     let output_path = format!("outputs/qtree_{}.png", problem_id);
     img.save(&crate::util::project_path(&output_path));
