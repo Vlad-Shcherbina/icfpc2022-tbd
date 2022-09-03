@@ -131,7 +131,7 @@ crate::entry_point!("api_demo", api_demo);
 fn api_demo() {
     let mut client = crate::db::create_client();
 
-    let sid = submit_best_solution(&mut client, 27);
+    let sid = submit_best_solution(&mut client, 7);
     std::thread::sleep(std::time::Duration::from_secs(20));
     println!("{:#?}", check_submission(&mut client, sid));
     client.query("SELECT * FROM good_submissions", &[])
