@@ -45,8 +45,6 @@ pub fn isolate_rect(p: &mut PainterState, mut root_id: BlockId, rect: Shape) -> 
             root_shape = p.blocks[&root_id].shape;
         }
     }
-    dbg!(&root_id);
-    dbg!(root_shape);
 
     if rect.x2 == root_shape.x2 {
         if rect.y2 == root_shape.y2 {

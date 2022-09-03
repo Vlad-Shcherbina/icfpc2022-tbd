@@ -4,6 +4,7 @@ use crate::image::Image;
 // use crate::invocation::{record_this_invocation, Status};
 // use crate::uploader::upload_solution;
 use crate::solver_utils::*;
+use crate::seg_util;
 
 use crate::basic::Move::*;
 
@@ -126,50 +127,22 @@ fn swan_solver() {
         }
 
         let mut painter = PainterState::new(&problem);
-        let mut moves = vec![];
+        let mut all_moves = vec![];
         let mut root = BlockId::root(0);
         for (shape, color) in &rects {
-            let m = PCut { block_id: root.clone(), x: shape.x1 + 1, y: shape.y1 + 1};
-            let ids1 = painter.apply_move(&m).new_block_ids;
-            moves.push(m);
-
-            let m = PCut { block_id: ids1[2].clone(), x: shape.x2 - 1, y: shape.y2 - 1};
-            let ids2 = painter.apply_move(&m).new_block_ids;
-            moves.push(m);
-
-            let m = ColorMove { block_id: ids2[0].clone(), color: *color };
+            let (id, moves) = seg_util::isolate_rect(&mut painter, root, *shape);
+            all_moves.extend(moves);
+            let m = ColorMove { block_id: id, color: *color };
             painter.apply_move(&m);
-            moves.push(m);
+            all_moves.push(m);
 
-            let m = Merge { block_id1: ids2[0].clone(), block_id2: ids2[1].clone() };
-            let qq1 = painter.apply_move(&m).new_block_ids[0].clone();
-            moves.push(m);
-
-            let m = Merge { block_id1: ids2[2].clone(), block_id2: ids2[3].clone() };
-            let qq2 = painter.apply_move(&m).new_block_ids[0].clone();
-            moves.push(m);
-
-            let m = Merge { block_id1: qq2, block_id2: qq1 };
-            let qq3 = painter.apply_move(&m).new_block_ids[0].clone();
-            moves.push(m);
-
-            let m = Merge { block_id1: ids1[0].clone(), block_id2: ids1[1].clone() };
-            let qq4 = painter.apply_move(&m).new_block_ids[0].clone();
-            moves.push(m);
-
-            let m = Merge { block_id1: qq3, block_id2: ids1[3].clone() };
-            let qq5 = painter.apply_move(&m).new_block_ids[0].clone();
-            moves.push(m);
-
-            let m = Merge { block_id1: qq4, block_id2: qq5 };
-            let qq6 = painter.apply_move(&m).new_block_ids[0].clone();
-            moves.push(m);
-
-            root = qq6;
+            let (new_root, moves) = seg_util::merge_all(&mut painter);
+            all_moves.extend(moves);
+            root = new_root;
         }
 
         eprintln!("---");
-        for m in &moves {
+        for m in &all_moves {
             eprintln!("{}", m);
         }
         eprintln!("---");
