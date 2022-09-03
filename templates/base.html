@@ -6,12 +6,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}TODO: title{% endblock %}</title>
   <style>
+    table {
+      border-spacing: 0;
+    }
+
+    td {
+      padding: 0.2em;
+    }
+
     tr:nth-child(even) {
       background-color: lightgrey;
     }
 
     tr:nth-child(odd) {
       background-color: lightyellow;
+    }
+
+    thead > tr {
+      background-color: lightgrey !important;
+      color: dimgray;
     }
   </style>
 </head>

@@ -127,7 +127,7 @@ struct SolutionsOpts {
 <hr />
 <table>
 <thead>
-<th>timestamp</th><th>pr.</th><th>score</th><th></th><th>image dist.</th><th></th><th>moves cost</th><th>solver name</th><th>solver args</th><th>inv.<th>
+<tr><th>timestamp</th><th>pr.</th><th>score</th><th></th><th>image dist.</th><th></th><th>moves cost</th><th>solver name</th><th>solver args</th><th>inv.<th></tr>
 </thead>
 {% for row in rows %}
     <tr>
