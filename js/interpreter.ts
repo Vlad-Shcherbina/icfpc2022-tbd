@@ -254,9 +254,12 @@ run.addEventListener('click', () => {
                     throw new Error(`Block shapes are incompatible for ${cmd.block1} and ${cmd.block2}`);
                 }
                 this_step_cost = cost_est(blk1.c);
-                const c1 = blk1.c;
-                blk1.c = blk2.c;
-                blk2.c = c1;
+                const x1 = blk1.x;
+                const y1 = blk1.y;
+                blk1.x = blk2.x;
+                blk1.y = blk2.y;
+                blk2.x = x1;
+                blk2.y = y1;
                 break;
             }
             case "merge": {
