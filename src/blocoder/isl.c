@@ -31,9 +31,9 @@ String *blockid_str(blockid id) {
     volatile static int scount = 0;
     String *sb = ss[scount++ & 0xf];
     if (id.nof_digits > 0) {
-        if (id.nof_digits > 30) { fprintf(stderr, "Digit overflow\n"); return NULL; }
+        if (id.nof_digits > 29) { fprintf(stderr, "Digit overflow\n"); return NULL; }
         String *s = sb + sprintf(sb, "%lu", (u64)(id.digits >> id.nof_digits*2));
-        for (unsigned int i=id.nof_digits-1; i<id.nof_digits; i++) {
+        for (int i=id.nof_digits-1; i>=0; i--) {
             u8 a = (id.digits >> i*2) & 3;
             s += sprintf(s, ".%i", a);
         }

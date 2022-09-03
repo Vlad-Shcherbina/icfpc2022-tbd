@@ -40,7 +40,7 @@ else
 
 ONEFILE=1
 LIBS+= 
-CFLAGS = -O2 -fwhole-program -fomit-frame-pointer -march=i686 -mtune=core2 -mfpmath=sse2,fpu -msse2 -s 
+CFLAGS = -O3 -fwhole-program -fomit-frame-pointer -march=native -s 
 CC=gcc
 LDFLAGS=
 DEFINES+=-DCMOD_OPTIMIZE_SIZE
