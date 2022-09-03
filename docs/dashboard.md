@@ -5,6 +5,7 @@ Maybe we want to show large tables, maybe draw some HTML5 canvas stuff, maybe th
 
 1. Install TypeScript:
     ```
+    sudo apt install nodejs npm
     npm install -g typescript@latest
     ```
 
