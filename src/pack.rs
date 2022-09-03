@@ -10,6 +10,7 @@ pub fn packing(target: &Image) -> Vec<(Shape, Color)> {
             *cnts.entry(target.get_pixel(x as i32, y as i32)).or_default() += 1;
         }
     }
+    let bg_color = *cnts.iter().max_by_key(|(_, &cnt)| cnt).unwrap().0;
     let mut q = 0;
     let mut target = Image::new(target.width, target.height, Color::default());
     for (color, cnt) in cnts {
@@ -20,6 +21,8 @@ pub fn packing(target: &Image) -> Vec<(Shape, Color)> {
     }
 
     let mut rects: Vec<(Shape, Color)> = vec![];
+    rects.push((Shape::from_image(&target), bg_color));
+
     for i in 0..target.height {
         let mut color: Option<Color> = None;
         let mut len = 0;
@@ -28,7 +31,7 @@ pub fn packing(target: &Image) -> Vec<(Shape, Color)> {
             if Some(c) == color {
                 len += 1;
             } else {
-                if len > 0 {
+                if len > 0 && color.unwrap() != bg_color {
                     rects.push((Shape {
                         x1: j - len,
                         y1: i,
@@ -40,7 +43,7 @@ pub fn packing(target: &Image) -> Vec<(Shape, Color)> {
                 len = 1;
             }
         }
-        if len > 0 {
+        if len > 0 && color.unwrap() != bg_color {
             let j = target.width;
             rects.push((Shape {
                 x1: j - len,
