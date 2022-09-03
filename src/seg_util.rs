@@ -91,12 +91,89 @@ pub fn isolate_rect(p: &mut PainterState, mut root_id: BlockId, rect: Shape) -> 
     (root_id, moves)
 }
 
+struct State {
+    cnt: usize,
+    items: Vec<(bool, Shape)>,
+    plan: Vec<(usize, usize)>,
+    best_plan: Option<Vec<(usize, usize)>>,
+}
+
+fn plan_merge_all(shapes: &[Shape]) -> Vec<(usize, usize)> {
+    // TODO: choose best cost
+    let mut state = State {
+        cnt: shapes.len(),
+        items: shapes.iter().map(|&s| (true, s)).collect(),
+        plan: vec![],
+        best_plan: None,
+    };
+    fn rec(state: &mut State) {
+        if state.cnt == 1 {
+            state.best_plan = Some(state.plan.clone());
+            return;
+        }
+
+        for i in 0..state.items.len() {
+            if !state.items[i].0 {
+                continue;
+            }
+            for j in i + 1 .. state.items.len() {
+                if !state.items[j].0 {
+                    continue;
+                }
+                let merged = merge_shapes(state.items[i].1, state.items[j].1);
+                if let Some(merged) = merged {
+                    state.items[i].0 = false;
+                    state.items[j].0 = false;
+                    state.items.push((true, merged));
+                    state.plan.push((i, j));
+                    state.cnt -= 1;
+                    rec(state);
+                    state.cnt += 1;
+                    state.plan.pop();
+                    state.items.pop();
+                    state.items[i].0 = true;
+                    state.items[j].0 = true;
+                }
+            }
+        }
+    }
+    rec(&mut state);
+    state.best_plan.unwrap()
+}
+
+pub fn merge_all(p: &mut PainterState) -> (BlockId, Vec<Move>) {
+    let mut shapes: Vec<Shape> = vec![];
+    let mut ids: Vec<BlockId> = vec![];
+    for (id, block) in &p.blocks {
+        shapes.push(block.shape);
+        ids.push(id.clone());
+    }
+    let plan = plan_merge_all(&shapes);
+    let mut moves = vec![];
+    for (i, j) in plan {
+        let m = Merge {
+            block_id1: ids[i].clone(),
+            block_id2: ids[j].clone(),
+        };
+        let ids1 = p.apply_move(&m).new_block_ids;
+        moves.push(m);
+        ids.push(ids1[0].clone());
+    }
+
+    let root_id = ids.pop().unwrap();
+    assert_eq!(p.blocks.len(), 1);
+    assert!(p.blocks.contains_key(&root_id));
+    (root_id, moves)
+}
+
 crate::entry_point!("seg_demo", seg_demo);
 fn seg_demo() {
     let problem = Problem::load(1);
     let mut painter = PainterState::new(&problem);
 
-    isolate_rect(&mut painter, BlockId::root(0), Shape { x1: 10, y1: 15, x2: 30, y2: 40 });
+    isolate_rect(&mut painter, BlockId::root(0), Shape { x1: 0, y1: 0, x2: 30, y2: 40 });
+
+    merge_all(&mut painter);
 }
 
 #[cfg(test)]
@@ -107,6 +184,8 @@ fn check_isolate_rect(rect: Shape) {
     let (root_id, _moves) = isolate_rect(&mut painter, BlockId::root(0), rect);
     let root_shape = painter.blocks[&root_id].shape;
     assert_eq!(root_shape, rect);
+
+    merge_all(&mut painter);
 }
 
 #[cfg(test)]
