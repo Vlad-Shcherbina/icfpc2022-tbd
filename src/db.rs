@@ -23,4 +23,35 @@ fn init_tables() {
         timestamp TIMESTAMP WITH TIME ZONE NOT NULL
     );
     "#).unwrap();
+    client.batch_execute(r#"
+    CREATE TABLE IF NOT EXISTS submissions(
+
+        submission_id INTEGER PRIMARY KEY,
+
+        problem_id INTEGER NOT NULL,  -- could be foreign key, but maybe we don't want to bother with the "problems" table
+        solution_id INTEGER NOT NULL REFERENCES solutions(id),
+
+        timestamp TIMESTAMP WITH TIME ZONE NOT NULL
+    );
+
+    -- Insert into good_submissions when the API returns a SUCEEDED in the status field
+    CREATE TABLE IF NOT EXISTS good_submissions(
+
+        submission_id INTEGER PRIMARY KEY REFERENCES submissions(submission_id),
+        cost BIGINT NOT NULL,
+        file_url TEXT NOT NULL,
+
+        timestamp TIMESTAMP WITH TIME ZONE NOT NULL
+    );
+
+    -- Insert into bad_submissions when the API returns a FAILED in the status field
+    CREATE TABLE IF NOT EXISTS bad_submissions(
+
+        submission_id INTEGER PRIMARY KEY REFERENCES submissions(submission_id),
+        error TEXT NOT NULL,
+        file_url TEXT NOT NULL,
+
+        timestamp TIMESTAMP WITH TIME ZONE NOT NULL
+    );
+    "#).unwrap();
 }

@@ -1,6 +1,6 @@
 // use std::time::SystemTime;
 use askama::Template;
-use postgres::{types::Json};
+use postgres::types::Json;
 use crate::{util::DateTime, invocation::Invocation};
 use crate::basic::*;
 use crate::util::project_path;
@@ -184,7 +184,6 @@ struct SolutionsOpts {
     <th>moves cost</th>
     <th></th>
     <th>solver name</th>
-    <th>solver args</th>
     <th>inv.<th>
 </tr>
 </thead>

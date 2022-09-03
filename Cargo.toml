@@ -20,7 +20,8 @@ pico-args = { version = "*", features = ["eq-separator"] }
 rstats = "^1"
 base64 = "*"
 rand = "*"
-ureq = "*"
+ureq = { version = "*", features = ["json"] }
+multipart = "*"
 
 [profile.dev.package."*"]
 opt-level = "s"
