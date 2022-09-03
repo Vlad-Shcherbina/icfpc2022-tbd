@@ -22,7 +22,10 @@ fn shape_distance(colors: &HashMap<Color, f64>, color: &Color) -> f64 {
     d
 }
 
-fn gradient_step(colors: &HashMap<Color, f64>, color: &mut [f64; 4]) {
+static K_STEP_NUM: i32 = 500;
+static K_STEP: f64 = 0.8;
+
+fn gradient_step(colors: &HashMap<Color, f64>, color: &mut [f64; 4], step_size: f64) {
     let mut gradient = [0f64; 4];
     for (k, v) in colors {
         let mut step = [0f64; 4];
@@ -32,15 +35,16 @@ fn gradient_step(colors: &HashMap<Color, f64>, color: &mut [f64; 4]) {
             len += step[i] * step[i];
         }
         if len > 1.0 {
+            let coeff = 1.0 / len.sqrt() * v;
             for i in 0..4 {
-                gradient[i] += step[i] / len.sqrt() * v;
+                gradient[i] += step[i] * coeff;
             }
         }
     }
     let mut len = 0f64;
     for i in 0..4 { len += gradient[i] * gradient[i]; }
     if len > 1.0 {
-        for i in 0..4 { color[i] += gradient[i] / len.sqrt(); }
+        for i in 0..4 { color[i] += gradient[i] / len.sqrt() * step_size; }
     }
 }
 
@@ -63,13 +67,26 @@ pub fn color_freqs(pic: &Image, shape: &Shape) -> HashMap<Color, f64> {
 }
 
 fn optimal_color_for_color_freqs(color_freqs: &HashMap<Color, f64>) -> Color {
-    let k_step_num = 600;
     let color = Color::default();
     let mut color_array = color_to_f64(&color);
-    for _ in 0..k_step_num {
-        gradient_step(color_freqs, &mut color_array);
+    let mut step_size: f64 = 100.0;
+    let mut last_color = color_array.clone();
+    let mut last_dist = dist_to_color_freqs(color_freqs, &f64_to_color(&last_color));
+    let mut cnt: i32 = 0;
+    for _ in 0..K_STEP_NUM {
+        gradient_step(color_freqs, &mut color_array, step_size);
+        let new_dist = dist_to_color_freqs(color_freqs, &f64_to_color(&color_array));
+        if new_dist.abs() > last_dist.abs() { break; }
+        last_dist = new_dist;
+        last_color = color_array;
+
+        step_size *= K_STEP;
+        if step_size < 1.0 { step_size = 1.0; }
+
+        cnt += 1
     }
-    f64_to_color(&color_array)
+    dbg!(cnt);
+    f64_to_color(&last_color)
 }
 
 pub fn optimal_color_for_block(pic: &Image, shape: &Shape) -> Color {
@@ -118,9 +135,17 @@ pub fn k_means(color_freqss: &[HashMap<Color, f64>], num_clusters: usize) -> Vec
     centers
 }
 
+
 crate::entry_point!("gradient", gradient);
 fn gradient() {
-    let target = Image::load(&project_path(format!("data/problems/{}.png", 11)));
+    let args: Vec<String> = std::env::args().skip(2).collect();
+    if args.len() != 1 {
+        println!("Usage: cargo run --release gradient <problem id>");
+        std::process::exit(1);
+    }
+    let problem_id: i32 = args[0].parse().unwrap();
+
+    let target = Image::load(&project_path(format!("data/problems/{}.png", problem_id)));
 
     let mut colors: HashMap<Color, f64> = HashMap::new();
     for x in 0..target.width {
@@ -128,19 +153,14 @@ fn gradient() {
             *colors.entry(target.get_pixel(x, y)).or_default() += 1.0;
         }
     }
+    let shape = Shape{x1: 0, x2: target.width, y1: 0, y2: target.height};
 
-    let mut color_array = [0f64; 4];
-    let mut total = 0f64;
+    let start = std::time::Instant::now();
+    let colors = color_freqs(&target, &shape);
+    dbg!(start.elapsed());
 
-    for (k, v) in &colors {
-        for i in 0..4 {
-            color_array[i] += k.0[i] as f64;
-        }
-        total += v;
-    }
-
-    for i in 0..4 { color_array[i] /= (target.height * target.width) as f64; }
-    println!("{}", shape_distance(&colors, &f64_to_color(&color_array)));
-    println!("{}", shape_distance(&colors, &optimal_color_for_block(&target,
-        &Shape{x1: 0, x2: target.width, y1: 0, y2: target.height})));
+    let start = std::time::Instant::now();
+    let res = optimal_color_for_color_freqs(&colors);
+    dbg!(start.elapsed());
+    println!("{}", shape_distance(&colors, &res));
 }
