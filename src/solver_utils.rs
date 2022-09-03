@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 use rand::prelude::*;
+use rstats::{VecVec};
 
 use crate::{basic::{Color, Shape }, image::Image, util::project_path};
 
@@ -89,6 +90,7 @@ fn optimal_color_for_color_freqs(color_freqs: &HashMap<Color, f64>) -> Color {
     f64_to_color(&last_color)
 }
 
+// Gradient descent based. See also gmedian_color().
 pub fn optimal_color_for_block(pic: &Image, shape: &Shape) -> Color {
     let colors = color_freqs(pic, shape);
     optimal_color_for_color_freqs(&colors)
@@ -135,7 +137,6 @@ pub fn k_means(color_freqss: &[HashMap<Color, f64>], num_clusters: usize) -> Vec
     centers
 }
 
-
 crate::entry_point!("gradient", gradient);
 fn gradient() {
     let args: Vec<String> = std::env::args().skip(2).collect();
@@ -163,4 +164,46 @@ fn gradient() {
     let res = optimal_color_for_color_freqs(&colors);
     dbg!(start.elapsed());
     println!("{}", shape_distance(&colors, &res));
+}
+
+pub fn mean_color(img: &Image, shape: Shape) -> Color {
+    let (mut r, mut g, mut b, mut a) = (0u32, 0u32, 0u32, 0u32);
+    let mut pixels = 0;
+    for x in shape.x1..shape.x2 {
+        for y in shape.y1..shape.y2 {
+            let p = img.get_pixel(x, y);
+            r += p.0[0] as u32; g += p.0[1] as u32; b += p.0[2] as u32; a += p.0[3] as u32;
+            pixels += 1;
+        }
+    }
+    Color([
+        (r / pixels) as u8,
+        (g / pixels) as u8,
+        (b / pixels) as u8,
+        (a / pixels) as u8,
+    ])
+}
+
+// Geometric median calculated using Weiszfeld's algorithm.
+// Probably better than gradient descent.
+pub fn gmedian_color(img: &Image, shape: Shape) -> Color {
+    let mut colors = vec![];
+    for y in shape.y1..shape.y2 {
+        for x in shape.x1..shape.x2 {
+            colors.push(Vec::from(img.get_pixel(x, y).0));
+        }
+    }
+    let median = colors.gmedian(0.5);
+    for component in median.iter() {
+        if component.is_nan() {
+            // Fallback to mean. I've no idea why the median algorithm fails sometimes.
+            return mean_color(img,shape);
+        }
+    }
+    Color ([
+        median[0].round() as u8,
+        median[1].round() as u8,
+        median[2].round() as u8,
+        median[3].round() as u8,
+    ])
 }
