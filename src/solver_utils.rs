@@ -99,6 +99,7 @@ pub fn best_from_palette(color_freqs: &HashMap<Color, f64>, palette: &[Color]) -
 }
 
 pub fn k_means(color_freqss: &[HashMap<Color, f64>], num_clusters: usize) -> Vec<Color> {
+    let _t = crate::stats_timer!("k_means").time_it();
     let mut centers = vec![];
     for _ in 0..num_clusters {
         centers.push(Color([

@@ -49,6 +49,7 @@ fn swan_solver() {
         }
     }
 
+    let start = std::time::Instant::now();
     for problem_id in problem_range {
         eprintln!("*********** problem {} ***********", problem_id);
         let problem = Problem::load(problem_id);
@@ -69,9 +70,13 @@ fn swan_solver() {
             tx.commit().unwrap();
         }
     }
+    eprintln!("{}", crate::stats::STATS.render());
+    eprintln!("it took {:?}", start.elapsed());
 }
 
 fn solve(args: &SolverArgs, problem: &Problem) -> (i64, Vec<Move>) {
+    let _t = crate::stats_timer!("solve").time_it();
+
     let &SolverArgs {
         px, py, num_colors,
     } = args;

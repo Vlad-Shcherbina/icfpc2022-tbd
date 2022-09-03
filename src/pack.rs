@@ -143,6 +143,7 @@ fn rec(i: usize, state: &mut State) {
 }
 
 pub fn packing2(target: &Image) -> Vec<(Shape, Color)> {
+    let _t = crate::stats_timer!("packing2").time_it();
     let mut cnts: HashMap<Color, i32> = HashMap::new();
     for y in 0..target.height {
         for x in 0..target.width {

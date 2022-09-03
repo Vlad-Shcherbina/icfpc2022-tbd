@@ -13,6 +13,7 @@ mod solver_utils;
 mod seg_util;
 mod api;
 mod pack;
+mod stats;
 
 crate::entry_point!("hello", hello);
 fn hello() {
