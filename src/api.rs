@@ -21,7 +21,7 @@ impl Default for Conf {
         Conf {
             host_proto: "https".into(),
             host_fqdn: "robovinci.xyz".into(),
-            auth: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImptQG1lbW9yaWNpLmRlIiwiZXhwIjoxNjYyMjk2NjEyLCJvcmlnX2lhdCI6MTY2MjIxMDIxMn0.WVHn_sxhVQA0QzSFfHinVNJqhC0LgXme5yvM57O-VgI".into(),
+            auth: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImptQG1lbW9yaWNpLmRlIiwiZXhwIjoxNjYyMzgzMzMxLCJvcmlnX2lhdCI6MTY2MjI5NjkzMX0.7TFDg8_mbE81GjZxVnAFSZ3HdahhCr30vu2ZO5U5C84".into(),
             api_v: "api".into(),
             //users: vec!["users".into()],
             problems: |x| { vec!["problems".into(), format!("{}", x)]},
