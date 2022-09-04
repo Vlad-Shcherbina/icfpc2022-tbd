@@ -42,8 +42,8 @@ fn swan_solver() {
 
     let mut argss = vec![];
     for num_colors in 2..=5 {
-        for px in [40, 50, 80] {
-            for py in [40, 50, 80] {
+        for px in [20, 25, 40, 50, 80, 100] {
+            for py in [20, 25, 40, 50, 80, 100] {
                 argss.push(SolverArgs { px, py, num_colors });
             }
         }
@@ -205,6 +205,9 @@ fn solve(args: &SolverArgs, problem: &Problem) -> (i64, Vec<Move>) {
         let m = Swap { block_id1: id1, block_id2: id2 };
         painter.apply_move(&m);
         all_moves.push(m);
+
+        let (_new_root, moves) = seg_util::merge_all(&mut painter);
+        all_moves.extend(moves);
     }
 
     // eprintln!("---");
