@@ -156,6 +156,19 @@ pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: Respo
         return resp.code("200 OK").body(s);
     }
 
+    if let Some(path) = req.path.strip_prefix("submit/") {
+        assert_eq!(req.method, "POST");
+        let solution_id: i32 = path.parse().unwrap();
+        let client = &mut state.lock().unwrap().client;
+        let submission_id = crate::api::submit_solution(client, solution_id);
+
+        std::thread::sleep(std::time::Duration::from_secs_f32(1.0));
+        // dunno why, for some reason the submission
+        // doesn't show immediately in the submissions table
+
+        return resp.code("303 See Other").header("Location", format!("/submission/#sub{submission_id}")).body("");
+    }
+
     resp.code("404 Not Found").body("not found")
 }
 
@@ -243,6 +256,9 @@ struct SolutionsTemplate {
 <p>Score: {{ moves_cost + image_distance }} = {{ image_distance }} + {{ moves_cost }}</p>
 <p>Move cost breakdown: {{ "{:?}"|format(cost_breakdown) }} </p>
 <p><a id="run_in_interpreter">Run in visualizer</a></p>
+<form method="POST" action="/solution/submit/{{ id }}">
+<input type="submit" value="Submit this solution">
+</form>
 <p>
     <img src="{{ img_data_uri }}"/>
     <img src="/data/problems/{{ problem_id }}.png"/>

@@ -87,6 +87,12 @@ struct GoodSubmission {
 {% extends "base.html" %}
 {% block title %}sub/{% endblock %}
 {% block body %}
+<style>
+tr:target {
+  background-color: yellow;
+}
+</style>
+If your very recent submission is not there, refresh the page.
 <table>
 <thead>
 <tr>
@@ -102,7 +108,7 @@ struct GoodSubmission {
 </thead>
 <tbody>
 {% for g in goods %}
-  <tr>
+  <tr id="sub{{ g.submission_id }}">
     <td>{{ g.timestamp.format("%d %H:%M:%S").to_string() }}</td>
     <td>#{{ g.submission_id }} <small><a href="{{ g.file_url }}">(dump)</a></small></td>
     <td><a href="/solution/?archive=true&problem_id={{ g.problem_id }}">#{{ g.problem_id }}</a></td>
