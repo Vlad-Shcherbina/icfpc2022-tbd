@@ -57,22 +57,20 @@ fn kyeet_do(args: &KyeetArgs, problem: &Problem) -> Image {
     let mut centered: HashMap<Color, f64> = HashMap::default();
     let mut cfs1 = cfs;
     // let mut cfs1_ptr = &cfs1;
-    let mut i = 0;
-    eprintln!("! ({}) !", cfs1.len());
+    // let mut i = 0;
+    // eprintln!("! ({}) !", cfs1.len());
     while !cfs1.is_empty() {
         // eprintln!("! ({}) !", cfs1.len());
-        i += 1;
-        if i % 100 == 0 {
-            eprint!("({})", cfs1.len());
-        }
-        // let cfs2 = cfs1.clone();
-        // let tube_r = cfs2.iter().next().unwrap();
-        // let tube = (tube_r.0.clone(), tube_r.1.clone());
-        let (tube, cfs2) = squeeze_once(args.dt, &cfs1, i % 100 == 0);
-        cfs1.retain(|_, _| false);
-        for c2 in cfs2 {
-            cfs1.insert(c2.0, c2.1);
-        }
+        // i += 1;
+        // if i % 100 == 0 {
+        // eprint!("({})", cfs1.len());
+        // }
+        let (tube, cfs2) = squeeze_once(args.dt, &cfs1, false);
+        // cfs1.retain(|_, _| false);
+        // for c2 in cfs2 {
+        //     cfs1.insert(c2.0, c2.1);
+        // }
+        cfs1 = cfs2;
         centered.insert(tube.0, tube.1);
     }
 
