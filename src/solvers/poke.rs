@@ -1,6 +1,7 @@
 #![allow(clippy::infallible_destructuring_match)]
 
 use crate::basic::*;
+use crate::image::{Image};
 use crate::invocation::{record_this_invocation, Status};
 use crate::uploader::upload_solution;
 
@@ -8,9 +9,8 @@ use std::collections::{HashSet, HashMap};
 
 struct State<'a> {
     painter_state: PainterState<'a>,
-    tile_size: i32,
-    //initial_palette: HashSet<Color>,
-    color_distances: HashMap<(Color, i32, i32), f64>,
+    //target: Image,
+    distances: HashMap<(BlockId, Shape), f64>,
     //width: i32,
     //height: i32
 }
@@ -45,18 +45,29 @@ impl<'a> State<'a> {
                 }
             }
         }
+        let target = problem.target.clone();
+        let distances = Self::compute_distances(&painter_state, &target);
         State {
             painter_state,
-            tile_size,
-            //initial_palette,
-            color_distances,
+            //target,
+            distances,
             //width: problem.width,
             //height: problem.height
         }
     }
 
-    fn block_idx(&self, block: &Block) -> (i32, i32) {
-        (block.shape.x1 / self.tile_size, block.shape.y1 / self.tile_size)
+    fn compute_distances(painter_state: &PainterState, target: &Image) -> HashMap<(BlockId, Shape), f64> {
+        eprintln!("Computing distances");
+        let mut distances = HashMap::<(BlockId, Shape), f64>::new();
+        let img = painter_state.render();
+        for (block_id1, block1) in &painter_state.blocks {
+            for block2 in painter_state.blocks.values() {
+                let distance = image_slices_distance(&img, &target, block1.shape, block2.shape);
+                distances.insert((block_id1.clone(), block2.shape), distance);
+            }
+        }
+        eprintln!("Done computing distances");
+        distances
     }
     
     fn solve(&mut self) -> Vec<Move> {
@@ -81,22 +92,12 @@ impl<'a> State<'a> {
             let mut best_swap = (BlockId::root(0), BlockId::root(0));
 
             for (block_id1, block1) in &self.painter_state.blocks {
-                let (i1, j1) = self.block_idx(block1);
-                let color1 = match block1.pieces[0].1 {
-                    Pic::Unicolor(color) => color,
-                    Pic::Bitmap(_) => todo!(),
-                };
                 for (block_id2, block2) in &self.painter_state.blocks {
-                    let (i2, j2) = self.block_idx(block2);
-                    let color2 = match block2.pieces[0].1 {
-                        Pic::Unicolor(color) => color,
-                        Pic::Bitmap(_) => todo!(),
-                    };
                     let gain_from_swap = swap_cost as f64 +
-                        self.color_distances[&(color1, i2, j2)] +
-                        self.color_distances[&(color2, i1, j1)] -
-                        self.color_distances[&(color1, i1, j1)] -
-                        self.color_distances[&(color2, i2, j2)];
+                        self.distances[&(block_id1.clone(), block2.shape)] +
+                        self.distances[&(block_id2.clone(), block1.shape)] -
+                        self.distances[&(block_id1.clone(), block1.shape)] -
+                        self.distances[&(block_id2.clone(), block2.shape)];
                     if gain_from_swap < best_gain {
                         best_gain = gain_from_swap;
                         best_swap = (block_id1.clone(), block_id2.clone());
@@ -112,6 +113,7 @@ impl<'a> State<'a> {
                 };
                 self.painter_state.apply_move(m);
                 moves.push(m.clone());
+                //self.update_distances_after_swap(&best_swap.0, &best_swap.1);
             }
         };
         moves

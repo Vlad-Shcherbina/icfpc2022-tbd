@@ -256,7 +256,7 @@ color [0.1] [1, 2, 3, 4]
 ");
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Shape {
     pub x1: i32,
     pub y1: i32,
@@ -741,15 +741,22 @@ pub fn image_slice_distance_to_color(img: &Image, shape: Shape, color: &Color) -
     res
 }
 
-pub fn image_slice_distance(img1: &Image, img2: &Image, shape: Shape) -> f64 {
+pub fn image_slices_distance(img1: &Image, img2: &Image, shape1: Shape, shape2: Shape) -> f64 {
+    assert!(shape1.width() == shape2.width());
+    assert!(shape1.height() == shape2.height());
     let mut res = 0.0f64;
-    for y in shape.y1..shape.y2 {
-        for x in shape.x1..shape.x2 {
-            res += img1.get_pixel(x, y).dist(&img2.get_pixel(x, y));
+    for dy in 0..shape1.height() {
+        for dx in 0..shape1.width() {
+            res += img1.get_pixel(shape1.x1 + dx, shape1.y1 + dy)
+                .dist(&img2.get_pixel(shape2.x1 + dx, shape2.y1 + dy));
         }
     }
     res *= 0.005;
     res
+}
+
+pub fn image_slice_distance(img1: &Image, img2: &Image, shape: Shape) -> f64 {
+    return image_slices_distance(img1, img2, shape, shape);
 }
 
 pub fn image_distance(img1: &Image, img2: &Image) -> f64 {
