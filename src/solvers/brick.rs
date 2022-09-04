@@ -50,7 +50,7 @@ fn brick_solver() {
                 let client = &mut *client.lock().unwrap();
                 let mut tx = client.transaction().unwrap();
                 let incovation_id = record_this_invocation(&mut tx, Status::KeepRunning { seconds: 65.0 });
-                if improvements.is_empty() {
+                if !improvements.is_empty() {
                     for (problem_id, moves) in improvements.drain() {
                         if dry_run {
                             eprintln!("dry run: pretend submit improvement for problem {}", problem_id);
