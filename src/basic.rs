@@ -803,11 +803,14 @@ impl Problem {
 
         let mut start_blocks: Vec<(BlockId, Block)> = vec![];
 
-        let initial_img;
+        let source_img_path = project_path(format!("data/problems/{}.source.png", problem_id));
+        let initial_img = if source_img_path.exists() {
+            Some(Image::load(&source_img_path))
+        } else {
+            None
+        };
 
         if initial.exists() {
-            initial_img = Some(Image::load(&project_path(format!("data/problems/{}.initial.png", problem_id))));
-
             let initial = std::fs::read_to_string(initial).unwrap();
             let initial: InitialCanvas = serde_json::from_str(&initial).unwrap();
             assert_eq!(target.width, initial.width);
@@ -841,7 +844,6 @@ impl Problem {
                 shape,
                 pieces: vec![(shape, Pic::Unicolor(Color([255, 255, 255, 255])))],
             }));
-            initial_img = None;
         }
 
         let base_costs = if problem_id >= 36 {
