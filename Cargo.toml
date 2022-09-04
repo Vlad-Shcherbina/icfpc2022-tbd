@@ -23,6 +23,8 @@ rand = "*"
 ureq = { version = "*", features = ["json"] }
 multipart = "*"
 fxhash = "*"
+rand_core = "*"
+rand_chacha = "*"
 
 [profile.dev.package."*"]
 opt-level = "s"

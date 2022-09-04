@@ -634,6 +634,7 @@ impl PainterState {
         while self.history.len() != target_size {
             self.rollback_move()
         }
+        self.snapshot = None
     }
 }
 
