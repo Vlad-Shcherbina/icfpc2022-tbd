@@ -33,7 +33,10 @@ impl Image {
             for x in 0..self.width {
                 let (x1, y1) = match t {
                     Transformation::TransposeXY => (y, x),
-                    Transformation::FlipY(_) => (x, self.height - 1 - y),
+                    Transformation::FlipY(h) => {
+                        assert_eq!(h, &self.height);
+                        (x, h - 1 - y)
+                    }
                 };
                 res.set_pixel(x1, y1, self.get_pixel(x, y));
             }
@@ -45,10 +48,10 @@ impl Image {
 impl Shape {
     pub fn transform(&self, t: &Transformation) -> Shape {
         match t {
-            Transformation::TransposeXY => 
-                Shape {x1: self.y2, y1: self.x2, x2: self.y1, y2: self.x1},
+            Transformation::TransposeXY =>
+                Shape {x1: self.y1, y1: self.x1, x2: self.y2, y2: self.x2},
             Transformation::FlipY(h) =>
-                Shape {x1: self.x1, y1: h - 1 - self.y2, x2: self.x2, y2: h - 1 - self.y1},
+                Shape {x1: self.x1, y1: h - self.y2, x2: self.x2, y2: h - self.y1},
         }
     }
 }
@@ -287,4 +290,43 @@ fn test_transform_solution() {
     transformed_moves = transform_solution(&transformed_moves, &Transformation::TransposeXY);
     assert_solutions_equal(&moves, &transformed_moves);
 
+}
+
+fn check_transform_e2e(problem_id: i32, sol: &str, tr: &Transformation) {
+    let moves = Move::parse_many(sol);
+
+    let problem = Problem::load(problem_id);
+    let mut painter = PainterState::new(&problem);
+    for m in &moves {
+        painter.apply_move(m);
+    }
+    let img = painter.render();
+
+    let transformed_problem = problem.transform(tr);
+    let transformed_moves = transform_solution(&moves, tr);
+    let mut transformed_painter = PainterState::new(&transformed_problem);
+    for m in &transformed_moves {
+        transformed_painter.apply_move(m);
+    }
+    let transformed_img = transformed_painter.render();
+
+    assert_eq!(painter.cost, transformed_painter.cost);
+    assert_eq!(img, transformed_img.transform(tr));
+}
+
+#[test]
+fn test_transform_e2e() {
+    for tr in &[
+        Transformation::TransposeXY,
+        Transformation::FlipY(400),
+    ] {
+        check_transform_e2e(1, "", tr);
+        check_transform_e2e(30, "", tr);  // with initial bricks
+        check_transform_e2e(36, "", tr);  // with initial painting
+
+        check_transform_e2e(1, "color [0] [123, 34, 55, 255]", tr);
+
+        // TODO: this is broken
+        // check_transform_e2e(30, "merge [0] [1]", tr);
+    }
 }
