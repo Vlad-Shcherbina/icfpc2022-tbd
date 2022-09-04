@@ -471,46 +471,60 @@ impl<'a> State<'a> {
                     root_id = new_root;
                 }
                 Action::Swap { shape1, shape2 } => {
-                    let (cut, s1, s2);
-                    // todo PCut when possible
-                    if shape1.x2 <= shape2.x1 {
+                    let (cut, shape1_idx, shape2_idx);
+                    if (shape1.x2 <= shape2.x1 || shape2.x2 <= shape1.x1) && (shape1.y2 <= shape2.y1 || shape2.y2 <= shape1.y1) {
+                        let x = min(shape1.x2, shape2.x2);
+                        let y = min(shape1.y2, shape2.y2);
+                        if shape1.x1 < x && shape1.y1 < y {
+                            shape1_idx = 0;
+                        } else if shape1.y1 < y {
+                            shape1_idx = 1;
+                        } else if shape1.x1 < x {
+                            shape1_idx = 3;
+                        } else {
+                            shape1_idx = 2;
+                        }
+                        shape2_idx = [2, 3, 0, 1][shape1_idx];
+                        // println!("CUT {} {} {} {} 1@ {}, 2@ {}", shape1, shape2, x, y, shape1_idx, shape2_idx);
+                        cut = Move::PCut { block_id: root_id.clone(), x, y };
+                    } else if shape1.x2 <= shape2.x1 {
                         cut = Move::LCut {
                             block_id: root_id.clone(),
                             orientation: Orientation::Vertical,
                             line_number: shape1.x2,
                         };
-                        s1 = shape1;
-                        s2 = shape2;
+                        shape1_idx = 0;
+                        shape2_idx = 1;
                     } else if shape2.x2 <= shape1.x1 {
                         cut = Move::LCut {
                             block_id: root_id.clone(),
                             orientation: Orientation::Vertical,
                             line_number: shape2.x2,
                         };
-                        s1 = shape2;
-                        s2 = shape1;
+                        shape1_idx = 1;
+                        shape2_idx = 0;
                     } else if shape1.y2 <= shape2.y1 {
                         cut = Move::LCut {
                             block_id: root_id.clone(),
                             orientation: Orientation::Horizontal,
                             line_number: shape1.y2,
                         };
-                        s1 = shape1;
-                        s2 = shape2;
+                        shape1_idx = 0;
+                        shape2_idx = 1;
                     } else if shape2.y2 <= shape1.y1 {
                         cut = Move::LCut {
                             block_id: root_id.clone(),
                             orientation: Orientation::Horizontal,
                             line_number: shape2.y2,
                         };
-                        s1 = shape2;
-                        s2 = shape1;
+                        shape1_idx = 1;
+                        shape2_idx = 0;
                     } else {
                         panic!()
                     }
                     let res = self.painter.apply_move(&cut);
-                    let (block_id1, _) = seg_util::isolate_rect(&mut self.painter, res.new_block_ids[0].clone(), *s1);
-                    let (block_id2, _) = seg_util::isolate_rect(&mut self.painter, res.new_block_ids[1].clone(), *s2);
+                    let (block_id1, _) = seg_util::isolate_rect(&mut self.painter, res.new_block_ids[shape1_idx].clone(), *shape1);
+                    let (block_id2, _) = seg_util::isolate_rect(&mut self.painter, res.new_block_ids[shape2_idx].clone(), *shape2);
                     self.painter.apply_move(&Move::Swap { block_id1, block_id2 });
                     root_id = merge.merge_all(&mut self.painter).0;
                 }

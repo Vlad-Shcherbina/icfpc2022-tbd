@@ -7,7 +7,7 @@ pub fn isolate_rect(p: &mut PainterState, mut root_id: BlockId, rect: Shape) -> 
     let mut moves = vec![];
 
     let mut root_shape = p.blocks[&root_id].shape;
-    assert!(root_shape.contains(rect));
+    assert!(root_shape.contains(rect), "{} {}", root_shape, rect);
     if rect.x1 == root_shape.x1 {
         if rect.y1 == root_shape.y1 {
             // do nothing
