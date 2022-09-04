@@ -877,6 +877,10 @@ impl Problem {
             start_blocks,
         }
     }
+
+    pub fn shape(&self) -> Shape {
+        Shape { x1: 0, y1: 0, x2: self.width, y2: self.height }
+    }
 }
 
 crate::entry_point!("render_moves_example", render_moves_example);

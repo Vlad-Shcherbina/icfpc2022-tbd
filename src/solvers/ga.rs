@@ -140,19 +140,22 @@ impl<'a> Framework<'a> {
         }
     }
 
-    // fn crossover(&mut self, action1: Actions, action2: Actions) -> Actions {
-    //     let split1 = Uniform::new(0, action1.0.len()).sample(&mut self.rng);
-    //     let split2 = Uniform::new(0, action2.0.len()).sample(&mut self.rng);
-    //     if self.rng.gen_bool(0.5) {
-    //         let mut actions = action1.0.split_at(split1).0.to_vec();
-    //         actions.extend(action2.0.split_at(split2).1.to_vec());
-    //         Actions(actions)
-    //     } else {
-    //         let mut actions = action2.0.split_at(split2).0.to_vec();
-    //         actions.extend(action1.0.split_at(split1).1.to_vec());
-    //         Actions(actions)
-    //     }
-    // }
+    fn crossover(&mut self, action1: Actions, action2: Actions) -> Option<Actions> {
+        if action1.0.is_empty() || action2.0.is_empty() {
+            return None
+        }
+        let split1 = Uniform::new(0, action1.0.len()).sample(&mut self.rng);
+        let split2 = Uniform::new(0, action2.0.len()).sample(&mut self.rng);
+        Some(if self.rng.gen_bool(0.5) {
+            let mut actions = action1.0.split_at(split1).0.to_vec();
+            actions.extend(action2.0.split_at(split2).1.to_vec());
+            Actions(actions)
+        } else {
+            let mut actions = action2.0.split_at(split2).0.to_vec();
+            actions.extend(action1.0.split_at(split1).1.to_vec());
+            Actions(actions)
+        })
+    }
 
     // fn mutate_action(&mut self, action: &mut Action) {
     //     match action {
@@ -163,20 +166,67 @@ impl<'a> Framework<'a> {
     // }
 
     fn mutate_actions(&mut self, actions: &mut Actions) {
-        let choice = Uniform::new(0, 2).sample(&mut self.rng);
-        if choice == 0 || actions.0.is_empty() {
-            // add new action
-            let action = self.random_action();
-            let pos = Uniform::new(0, actions.0.len() + 1).sample(&mut self.rng);
-            actions.0.insert(pos, action);
-        } else if choice == 1 {
-            // remove
-            let pos = Uniform::new(0, actions.0.len()).sample(&mut self.rng);
-            actions.0.remove(pos);
-        } else {
-            panic!()
+        loop {
+            let mutation = Mutation::ALL.choose(&mut self.rng).unwrap();
+            match mutation {
+                Mutation::AddNew => {
+                    let action = self.random_action();
+                    let pos = Uniform::new(0, actions.0.len() + 1).sample(&mut self.rng);
+                    actions.0.insert(pos, action);
+                    break
+                }
+                Mutation::Delete => {
+                    if actions.0.is_empty() {
+                        continue
+                    }
+                    let pos = Uniform::new(0, actions.0.len()).sample(&mut self.rng);
+                    actions.0.remove(pos);
+                    break
+                }
+                Mutation::SmallMove => {
+                    if actions.0.is_empty() {
+                        continue
+                    }
+                    let dx = Uniform::new(-10, 10).sample(&mut self.rng);
+                    let dy = Uniform::new(-10, 10).sample(&mut self.rng);
+                    let root_shape = self.state.problem.shape();
+                    let pos = Uniform::new(0, actions.0.len()).sample(&mut self.rng);
+                    let a = actions.0[pos].shift(&root_shape, dx, dy);
+                    if let Some(a) = a {
+                        actions.0[pos] = a;
+                        break
+                    }
+                    continue
+                }
+                Mutation::SmallResize => {
+                    if actions.0.is_empty() {
+                        continue
+                    }
+                    let dx = Uniform::new(-10, 10).sample(&mut self.rng);
+                    let dy = Uniform::new(-10, 10).sample(&mut self.rng);
+                    let root_shape = self.state.problem.shape();
+                    let pos = Uniform::new(0, actions.0.len()).sample(&mut self.rng);
+                    let a = actions.0[pos].resize(&root_shape, dx, dy);
+                    if let Some(a) = a {
+                        actions.0[pos] = a;
+                        break
+                    }
+                    continue
+                }
+                Mutation::Swap => {
+                    if actions.0.len() < 2 {
+                        continue
+                    }
+                    let pos1 = Uniform::new(0, actions.0.len()).sample(&mut self.rng);
+                    let pos2 = Uniform::new(0, actions.0.len()).sample(&mut self.rng);
+                    if pos1 == pos2 {
+                        continue
+                    }
+                    actions.0.swap(pos1, pos2);
+                    break
+                }
+            }
         }
-
     }
 
     fn random_action(&mut self) -> Action {
@@ -192,10 +242,24 @@ impl<'a> Framework<'a> {
     // }
 
     fn run_one_generation(&mut self, gen: Vec<Actions>) -> Vec<Actions> {
-        let mut next_pop = gen.clone();
+        let mut next_pop = gen;
         for _ in 0..self.pop_multiplier*self.pop_size {
-            let mut a = gen.choose(&mut self.rng).unwrap().clone();
+            let mut a = next_pop.choose(&mut self.rng).unwrap().clone();
             self.mutate_actions(&mut a);
+            next_pop.push(a);
+        }
+        for _ in 0..self.pop_multiplier*self.pop_size {
+            let a1 = next_pop.choose(&mut self.rng).unwrap().clone();
+            let a2 = next_pop.choose(&mut self.rng).unwrap().clone();
+            if let Some(a) = self.crossover(a1, a2) {
+                next_pop.push(a);
+            }
+        }
+        for _ in 0..self.pop_multiplier*self.pop_size {
+            let mut a = next_pop.choose(&mut self.rng).unwrap().clone();
+            for _ in 0..10 {
+                self.mutate_actions(&mut a);
+            }
             next_pop.push(a);
         }
         let mut results: Vec<(i64, Actions)> = next_pop.into_iter().map(|a| {
@@ -238,8 +302,88 @@ enum Action {
     },
 }
 
+impl Action {
+    fn resize_shape(root: &Shape, shape: &Shape, dx: i32, dy: i32) -> Option<Shape> {
+        let x1 = shape.x1 - dx;
+        let x2 = shape.x2 + dx;
+        let y1 = shape.y1 - dy;
+        let y2 = shape.y2 + dy;
+        if x1 >= x2 || y1 >= y2 {
+            return None
+        }
+        if x1 < 0 || y1 < 0 || x2 > root.x2 || y2 > root.y2 {
+            return None
+        }
+        Some(Shape{ x1, y1, x2, y2 })
+    }
+
+    fn resize(&self, root: &Shape, dx: i32, dy: i32) -> Option<Action> {
+        match self {
+            Action::Color { shape } => {
+                let shape = Action::resize_shape(root, shape, dx, dy)?;
+                Some(Action::Color { shape })
+            }
+            Action::Swap { shape1, shape2 } => {
+                let shape1 = Action::resize_shape(root, shape1, dx, dy)?;
+                let shape2 = Action::resize_shape(root, shape2, dx, dy)?;
+                if shape1.intersect(&shape2).is_some() {
+                    return None
+                }
+                Some(Action::Swap{
+                    shape1,
+                    shape2,
+                })
+            }
+        }
+    }
+
+    fn shift_shape(root: &Shape, shape: &Shape, dx: i32, dy: i32) -> Option<Shape> {
+        let x1 = shape.x1 + dx;
+        let x2 = shape.x2 + dx;
+        let y1 = shape.y1 + dy;
+        let y2 = shape.y2 + dy;
+        if x1 < 0 || y1 < 0 || x2 > root.x2 || y2 > root.y2 {
+            return None
+        }
+        Some(Shape{ x1, y1, x2, y2 })
+    }
+
+    fn shift(&self, root: &Shape, dx: i32, dy: i32) -> Option<Action> {
+        match self {
+            Action::Color { shape } => {
+                let shape = Action::shift_shape(root, shape, dx, dy)?;
+                Some(Action::Color { shape })
+            }
+            Action::Swap { shape1, shape2 } => {
+                let shape1 = Action::shift_shape(root, shape1, dx, dy)?;
+                let shape2 = Action::shift_shape(root, shape2, dx, dy)?;
+                Some(Action::Swap { shape1, shape2 })
+            }
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 struct Actions (pub Vec<Action>);
+
+enum Mutation {
+    AddNew,
+    Delete,
+    SmallMove,
+    SmallResize,
+    Swap,
+}
+
+impl Mutation {
+    const ALL: [Mutation; 5] = [
+        Mutation::AddNew,
+        Mutation::Delete,
+        Mutation::SmallMove,
+        Mutation::SmallResize,
+        Mutation::Swap,
+    ];
+}
+
 
 struct State<'a> {
     problem: &'a Problem,
