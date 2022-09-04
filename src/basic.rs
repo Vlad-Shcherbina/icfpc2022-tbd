@@ -665,6 +665,17 @@ fn swap_blocks(block1: &mut Block, block2: &mut Block) {
     std::mem::swap(&mut block1.shape, &mut block2.shape);
 }
 
+pub fn image_slice_distance_to_color(img: &Image, shape: Shape, color: &Color) -> f64 {
+    let mut res = 0.0f64;
+    for y in shape.y1..shape.y2 {
+        for x in shape.x1..shape.x2 {
+            res += img.get_pixel(x, y).dist(color);
+        }
+    }
+    res *= 0.005;
+    res
+}
+
 pub fn image_slice_distance(img1: &Image, img2: &Image, shape: Shape) -> f64 {
     let mut res = 0.0f64;
     for y in shape.y1..shape.y2 {
