@@ -6,8 +6,8 @@ use crate::uploader::upload_solution;
 
 use std::collections::{HashSet, HashMap};
 
-struct State {
-    painter_state: PainterState,
+struct State<'a> {
+    painter_state: PainterState<'a>,
     tile_size: i32,
     //initial_palette: HashSet<Color>,
     color_distances: HashMap<(Color, i32, i32), f64>,
@@ -15,8 +15,8 @@ struct State {
     //height: i32
 }
 
-impl State {
-    fn new(problem: &Problem) -> State {        
+impl<'a> State<'a> {
+    fn new(problem: &'a Problem) -> State {        
         let painter_state = PainterState::new(problem);
         assert!(painter_state.blocks.len() > 1, "This solver only supports problems with initial blocks");
 
@@ -32,6 +32,7 @@ impl State {
         for block in painter_state.blocks.values() {
             let color = match block.pieces[0].1 {
                 Pic::Unicolor(color) => color,
+                Pic::Bitmap(_) => todo!(),
             };
             initial_palette.insert(color);
         }
@@ -83,11 +84,13 @@ impl State {
                 let (i1, j1) = self.block_idx(block1);
                 let color1 = match block1.pieces[0].1 {
                     Pic::Unicolor(color) => color,
+                    Pic::Bitmap(_) => todo!(),
                 };
                 for (block_id2, block2) in &self.painter_state.blocks {
                     let (i2, j2) = self.block_idx(block2);
                     let color2 = match block2.pieces[0].1 {
                         Pic::Unicolor(color) => color,
+                        Pic::Bitmap(_) => todo!(),
                     };
                     let gain_from_swap = swap_cost as f64 +
                         self.color_distances[&(color1, i2, j2)] +

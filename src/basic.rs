@@ -386,7 +386,7 @@ impl Shape {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Pic {
     Unicolor(Color),
-    // TODO: bitmap for problems 36-40
+    Bitmap(Shape),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -409,6 +409,7 @@ impl Block {
             }
             let sub_pic = match &p.1 {
                 Pic::Unicolor(c) => Pic::Unicolor(*c),
+                _ => todo!(),
             };
             pieces.push((
                 Shape {
@@ -452,7 +453,8 @@ enum PainterStateAction {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PainterState {
+pub struct PainterState<'a> {
+    initial_img: Option<&'a Image>,
     width: i32,
     height: i32,
     next_id: usize,
@@ -468,13 +470,14 @@ pub struct ApplyMoveResult {
     pub new_block_ids: Vec<BlockId>,  // new block IDs for "cut" and "merge" moves
 }
 
-impl PainterState {
-    pub fn new(p: &Problem) -> Self {
+impl<'a> PainterState<'a> {
+    pub fn new(p: &'a Problem) -> Self {
         for (id, _b) in &p.start_blocks {
             assert_eq!(id.0.len(), 1);
         }
         let next_id = p.start_blocks.iter().map(|(id, _)| id.0[0]).max().unwrap() + 1;
         PainterState {
+            initial_img: p.initial_img.as_ref(),
             width: p.width,
             height: p.height,
             next_id,
@@ -606,12 +609,25 @@ impl PainterState {
         let mut res = Image::new(self.width, self.height, Color::default());
         for block in self.blocks.values() {
             for (shape, pic) in &block.pieces {
-                for x in shape.x1..shape.x2 {
-                    for y in shape.y1..shape.y2 {
-                        let color = match pic {
-                            Pic::Unicolor(c) => *c,
-                        };
-                        res.set_pixel(x, y, color);
+                match pic {
+                    Pic::Unicolor(color) => {
+                        for y in shape.y1..shape.y2 {
+                            for x in shape.x1..shape.x2 {
+                                res.set_pixel(x, y, *color);
+                            }
+                        }
+                    }
+                    Pic::Bitmap(s) => {
+                        assert_eq!(s.width(), shape.width());
+                        assert_eq!(s.height(), shape.height());
+                        let img = self.initial_img.unwrap();
+                        let dx = s.x1 - shape.x1;
+                        let dy = s.y1 - shape.y1;
+                        for y in shape.y1..shape.y2 {
+                            for x in shape.x1..shape.x2 {
+                                res.set_pixel(x, y, img.get_pixel(x + dx, y + dy));
+                            }
+                        }
                     }
                 }
             }
@@ -741,13 +757,14 @@ struct InitialBlock {
     bottom_left: (i32, i32),
     #[serde(rename = "topRight")]
     top_right: (i32, i32),
-    color: [u8; 4],
+    color: Vec<i32>,
 }
 
 #[derive(Clone)]
 pub struct Problem {
     pub width: i32,
     pub height: i32,
+    pub initial_img: Option<Image>,
     pub target: Image,
     start_blocks: Vec<(BlockId, Block)>,
 }
@@ -759,23 +776,38 @@ impl Problem {
 
         let mut start_blocks: Vec<(BlockId, Block)> = vec![];
 
+        let initial_img;
+
         if initial.exists() {
+            initial_img = Some(Image::load(&project_path(format!("data/problems/{}.initial.png", problem_id))));
+
             let initial = std::fs::read_to_string(initial).unwrap();
             let initial: InitialCanvas = serde_json::from_str(&initial).unwrap();
             assert_eq!(target.width, initial.width);
             assert_eq!(target.height, initial.height);
             for b in initial.blocks {
                 let block_id = BlockId::parse(&b.block_id);
-                let color = Color(b.color);
                 let shape = Shape {
                     x1: b.bottom_left.0,
                     y1: b.bottom_left.1,
                     x2: b.top_right.0,
                     y2: b.top_right.1,
                 };
+                let pic = if b.color.len() == 4 {
+                    Pic::Unicolor(Color([
+                        b.color[0].try_into().unwrap(),
+                        b.color[1].try_into().unwrap(),
+                        b.color[2].try_into().unwrap(),
+                        b.color[3].try_into().unwrap(),
+                    ]))
+                } else {
+                    assert_eq!(shape.x1, b.color[0]);
+                    assert_eq!(shape.y1, b.color[1]);
+                    Pic::Bitmap(shape)
+                };
                 start_blocks.push((block_id, Block {
                     shape,
-                    pieces: vec![(shape, Pic::Unicolor(color))],
+                    pieces: vec![(shape, pic)],
                 }));
             }
         } else {
@@ -784,12 +816,14 @@ impl Problem {
                 shape,
                 pieces: vec![(shape, Pic::Unicolor(Color([255, 255, 255, 255])))],
             }));
+            initial_img = None;
         }
 
         Problem {
             width: target.width,
             height: target.height,
             target,
+            initial_img,  // TODO
             start_blocks,
         }
     }
@@ -797,15 +831,15 @@ impl Problem {
 
 crate::entry_point!("render_moves_example", render_moves_example);
 fn render_moves_example() {
-    let problem = Problem::load(29);
+    let problem = Problem::load(36);
 
     // let qq = std::fs::read_to_string(format!("data/problems/problem_{}.json", problem_id)).unwrap();
 
     let moves = vec![
-        Move::ColorMove {
-            block_id: BlockId::root(0),
-            color: Color([0, 74, 173, 255]),
-        },
+        // Move::ColorMove {
+        //     block_id: BlockId::root(0),
+        //     color: Color([0, 74, 173, 255]),
+        // },
         /*PCut {
             block_id: BlockId::root(0),
             x: 360,

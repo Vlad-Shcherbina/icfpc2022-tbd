@@ -9,9 +9,9 @@ use rand::rngs::ThreadRng;
 
 crate::entry_point!("ga_solver", ga_solver);
 
-struct Framework {
+struct Framework<'a> {
     rng: ThreadRng,
-    state: State,
+    state: State<'a>,
     uniform_action: UniformAction,
     pop_size: usize,
     pop_multiplier: usize,
@@ -151,8 +151,8 @@ impl Distribution<Action> for UniformAction {
     }
 }
 
-impl Framework {
-    fn new(problem: Problem, pop_size: usize, pop_multiplier: usize) -> Framework {
+impl<'a> Framework<'a> {
+    fn new(problem: &'a Problem, pop_size: usize, pop_multiplier: usize) -> Self {
         let shape = Shape {x1: 0, y1: 0, x2: problem.width, y2: problem.height};
         Framework {
             state: State::new(problem),
@@ -263,15 +263,15 @@ enum Action {
 #[derive(Clone)]
 struct Actions (pub Vec<Action>);
 
-struct State {
-    problem: Problem,
+struct State<'a> {
+    problem: &'a Problem,
     root_id: BlockId,
-    painter: PainterState,
+    painter: PainterState<'a>,
 }
 
-impl State {
-    fn new(problem: Problem) -> State {
-        let mut painter = PainterState::new(&problem);
+impl<'a> State<'a> {
+    fn new(problem: &'a Problem) -> State<'a> {
+        let mut painter = PainterState::new(problem);
         let (root_id, _) = seg_util::merge_all_2(&mut painter);
         State {
             problem,
@@ -385,7 +385,7 @@ fn ga_solver() {
         eprintln!("saved to {}", output_path);
     };
 
-    let mut framework = Framework::new(problem.clone(), 10, 10);
+    let mut framework = Framework::new(&problem, 10, 10);
     framework.run(new_best_callback);
 
     // let mut client = crate::db::create_client();

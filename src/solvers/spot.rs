@@ -99,7 +99,8 @@ fn spot_solver() {
         }
     }
 
-    let mut painter = PainterState::new(&Problem::load(problem_id));
+    let problem = Problem::load(problem_id);
+    let mut painter = PainterState::new(&problem);
     for m in &best_moves {
         painter.apply_move(m);
     }

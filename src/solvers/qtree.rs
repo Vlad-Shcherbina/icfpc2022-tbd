@@ -5,12 +5,12 @@ use crate::invocation::{record_this_invocation, Status};
 use crate::uploader::upload_solution;
 use crate::color_util::optimal_color_for_block;
 
-struct State {
+struct State<'a> {
     img: Image,
-    painter_state: PainterState,
+    painter_state: PainterState<'a>,
 }
 
-impl State {
+impl<'a> State<'a> {
     fn new(problem: &Problem) -> State {
         State {
             img: problem.target.clone(),
