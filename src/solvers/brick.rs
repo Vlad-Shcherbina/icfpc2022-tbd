@@ -2,6 +2,7 @@
 
 use std::collections::{HashSet, HashMap, BTreeMap};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicI64, Ordering::SeqCst};
 use rand::prelude::*;
 use crate::util::project_path;
 use crate::basic::*;
@@ -13,6 +14,11 @@ use crate::seg_util;
 
 use crate::basic::Move::*;
 
+struct Shared {
+    client: postgres::Client,
+    best_scores: BTreeMap<i32, i64>,
+    improvements: HashMap<i32, Vec<Move>>,
+}
 
 crate::entry_point!("brick_solver", brick_solver);
 fn brick_solver() {
@@ -34,24 +40,24 @@ fn brick_solver() {
         }
     }
     eprintln!("{:?}", best_scores);
-    let local_best_scores: BTreeMap<i32, Mutex<i64>> = problem_range.clone().map(|i| (i, Mutex::new(i64::MAX))).collect();
+    let local_best_scores: BTreeMap<i32, AtomicI64> = problem_range.clone().map(|i| (i, AtomicI64::new(i64::MAX))).collect();
     let improvements: HashMap<i32, Vec<Move>> = HashMap::new();
+    let shared = Shared {
+        client, best_scores, improvements,
+    };
+    let shared = Mutex::new(shared);
 
-    let client = Mutex::new(client);
-    let improvements = Mutex::new(improvements);
-    let best_scores: BTreeMap<_, _> = best_scores.into_iter().map(|(k, v)| (k, Mutex::new(v))).collect();
     std::thread::scope(|scope| {
         // imrovement submitter thread
         scope.spawn(|| {
             loop {
                 std::thread::sleep(std::time::Duration::from_secs(60));
-                let improvements = &mut *improvements.lock().unwrap();
-                eprintln!("submitting {} improvements", improvements.len());
-                let client = &mut *client.lock().unwrap();
-                let mut tx = client.transaction().unwrap();
+                let shared = &mut *shared.lock().unwrap();
+                eprintln!("submitting {} improvements", shared.improvements.len());
+                let mut tx = shared.client.transaction().unwrap();
                 let incovation_id = record_this_invocation(&mut tx, Status::KeepRunning { seconds: 65.0 });
-                if !improvements.is_empty() {
-                    for (problem_id, moves) in improvements.drain() {
+                if !shared.improvements.is_empty() {
+                    for (problem_id, moves) in shared.improvements.drain() {
                         if dry_run {
                             eprintln!("dry run: pretend submit improvement for problem {}", problem_id);
                         } else {
@@ -62,38 +68,40 @@ fn brick_solver() {
                 tx.commit().unwrap();
                 eprintln!("{}", crate::stats::STATS.render());
 
-                for (problem_id, best_score) in &best_scores {
-                    eprintln!("problem {}:  our {},  best {}", problem_id, local_best_scores[problem_id].lock().unwrap(), best_score.lock().unwrap());
+                for (problem_id, best_score) in &shared.best_scores {
+                    eprintln!("problem {}:  our {},  best {}", problem_id, local_best_scores[problem_id].load(SeqCst), best_score);
                 }
             }
         });
 
         for problem_id in problem_range {
             let local_best_score = &local_best_scores[&problem_id];
-            let best_score = &best_scores[&problem_id];
-            let improvements = &improvements;
+            let shared = &shared;
             scope.spawn(move || {
                 let problem = Problem::load(problem_id);
                 let mut painter = PainterState::new(&problem);
                 let (_, initial_moves) = seg_util::merge_all(&mut painter);
+                let mut best_blueprint = Blueprint::random();
                 loop {
-                    let ys = random_seps();
-                    let mut xss = vec![];
-                    for _ in 1..ys.len() {
-                        xss.push(random_seps());
-                    }
-                    let (score, moves) = do_bricks(&problem, &initial_moves, ys, xss);
+                    let blueprint = if thread_rng().gen_bool(0.5) {
+                        let mut b = best_blueprint.clone();
+                        b.mutate();
+                        b
+                    } else {
+                        Blueprint::random()
+                    };
+                    let (score, moves) = do_bricks(&problem, &initial_moves, blueprint.clone());
                     // eprintln!("{} {}", problem_id, score);
-                    let local_best_score = &mut *local_best_score.lock().unwrap();
-                    if score < *local_best_score {
-                        eprintln!("improvement for problem {}: {} -> {}", problem_id, *local_best_score, score);
-                        *local_best_score = score;
-                        let best_score = &mut *best_score.lock().unwrap();
+                    if score < local_best_score.load(SeqCst) {
+                        local_best_score.store(score, SeqCst);
+                        eprintln!("improvement for problem {}: {}", problem_id, score);
+                        best_blueprint = blueprint;
+                        let shared = &mut *shared.lock().unwrap();
+                        let best_score = shared.best_scores.get_mut(&problem_id).unwrap();
                         if score < *best_score {
                             eprintln!("new best score for problem {}: {} -> {}", problem_id, *best_score, score);
                             *best_score = score;
-                            let improvements = &mut *improvements.lock().unwrap();
-                            improvements.insert(problem_id, moves);
+                            shared.improvements.insert(problem_id, moves);
                         }
                     }
                 }
@@ -119,7 +127,29 @@ fn random_seps() -> Vec<i32> {
     res
 }
 
-fn do_bricks(problem: &Problem, initial_moves: &[Move], mut ys: Vec<i32>, mut xss: Vec<Vec<i32>>) -> (i64, Vec<Move>) {
+#[derive(Clone)]
+struct Blueprint {
+    ys: Vec<i32>,
+    xss: Vec<Vec<i32>>,
+}
+
+impl Blueprint {
+    fn random() -> Blueprint {
+        let ys = random_seps();
+        let mut xss = vec![];
+        for _ in 1..ys.len() {
+            xss.push(random_seps());
+        }
+        Blueprint { ys, xss }
+    }
+
+    fn mutate(&mut self) {
+        let i = thread_rng().gen_range(0..self.xss.len());
+        self.xss[i] = random_seps();
+    }
+}
+
+fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) -> (i64, Vec<Move>) {
     let _t = crate::stats_timer!("do_bricks").time_it();
     let mut painter = PainterState::new(problem);
     let mut all_moves = vec![];
@@ -132,6 +162,7 @@ fn do_bricks(problem: &Problem, initial_moves: &[Move], mut ys: Vec<i32>, mut xs
     assert_eq!(painter.blocks.len(), 1);
     let mut block_id = painter.blocks.keys().next().unwrap().clone();
 
+    let Blueprint { mut ys, mut xss } = blueprint;
     loop {
         let (new_block, moves) = seg_util::isolate_rect(&mut painter, block_id, Shape {
             x1: 0,
