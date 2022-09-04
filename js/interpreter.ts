@@ -9,9 +9,18 @@ type Command =
     | {type: "merge", block1: BlockId, block2: BlockId}
     | {type: "comment", text: string}
 
-const base_costs: { [K in Command['type']]: number } = {
+const base_costs_normal: { [K in Command['type']]: number } = {
     "cut-line": 7,
     "cut-point": 10,
+    "color": 5,
+    "swap": 3,
+    "merge": 1,
+    "comment": 0,
+}
+
+const base_costs_adjusted: { [K in Command['type']]: number } = {
+    "cut-line": 2,
+    "cut-point": 3,
     "color": 5,
     "swap": 3,
     "merge": 1,
@@ -67,7 +76,7 @@ function size(rect: Rect) {
     return rect.w*rect.h;
 }
 
-function step_cost(type: keyof typeof base_costs, canvas: Rect, block: Rect) {
+function step_cost(type: keyof typeof base_costs_normal, base_costs: typeof base_costs_normal, canvas: Rect, block: Rect) {
     return Math.round(base_costs[type] * size(canvas)/size(block));
 }
 
@@ -91,11 +100,17 @@ type BlockSpec = {
     bottomLeft: Point,
     topRight: Point,
     color: Color,
+} | {
+    blockId: string,
+    bottomLeft: Point,
+    topRight: Point,
+    pngBottomLeftPoint: Point,
 }
 
 type InitialCanvas = {
     width: number,
     height: number,
+    sourcePngPNG?: string,
     blocks: BlockSpec[],
 }
 
@@ -182,12 +197,31 @@ run.addEventListener('click', async () => {
     exec_steps = [];
     currentIndex = 0;
     let counter = initialCanvas.blocks.length;
+    const image = new Image();
+    image.crossOrigin = "Anonymous";
+    const base_costs = initialCanvas.sourcePngPNG != null ? base_costs_adjusted : base_costs_normal;
+    if (initialCanvas.sourcePngPNG != null) {
+        image.src = initialCanvas.sourcePngPNG;
+        await new Promise((resolve) => {image.onload = resolve});
+    }
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = image.width;
+    tempCanvas.height = image.height;
+    const tempCtx = tempCanvas.getContext('2d')!;
+    tempCtx.translate(0, image.height);
+    tempCtx.scale(1, -1);
+    tempCtx.drawImage(image, 0, 0);
     for(const block of initialCanvas.blocks){
         const w = block.topRight[0] - block.bottomLeft[0];
         const h = block.topRight[1] - block.bottomLeft[1];
         const x = block.bottomLeft[0], y = block.bottomLeft[1];
-        offscreenCtx.fillStyle = `rgba(${block.color[0]}, ${block.color[1]}, ${block.color[2]}, ${block.color[3]/255.0})`;
-        offscreenCtx.fillRect(x, y, w, h);
+        if ('color' in block) {
+            offscreenCtx.fillStyle = `rgba(${block.color[0]}, ${block.color[1]}, ${block.color[2]}, ${block.color[3]/255.0})`;
+            offscreenCtx.fillRect(x, y, w, h);
+        } else {
+            const id = tempCtx.getImageData(block.pngBottomLeftPoint[0],block.pngBottomLeftPoint[1],w,h);
+            offscreenCtx.putImageData(id, x, y);
+        }
         blocks.set(block.blockId, {x, y, w, h})
     }
     save_step(blocks, 0, {type: "comment", text: "Initial state"});
@@ -208,7 +242,7 @@ run.addEventListener('click', async () => {
             lastCmd = cmd;
             cmdCount += 1;
             let this_step_cost: number = 0;
-            const cost_est = step_cost.bind(this, cmd.type, {w: initialCanvas.width, h: initialCanvas.height});
+            const cost_est = step_cost.bind(this, cmd.type, base_costs, {w: initialCanvas.width, h: initialCanvas.height});
             switch(cmd.type) {
                 case "cut-point": {
                     const blk = blocks.get(cmd.block);
@@ -493,7 +527,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     referenceSelector.addEventListener('change', () => {
         loadReferenceImage();
     })
-    for (let i = 1; i <= 35; i++) {
+    for (let i = 1; i <= 40; i++) {
         const option = document.createElement('option');
         option.value = `${i}.png`;
         option.innerText = option.value;
