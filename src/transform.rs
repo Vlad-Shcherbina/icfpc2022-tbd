@@ -332,7 +332,23 @@ fn test_transform_e2e() {
 
         check_transform_e2e(1, "color [0] [123, 34, 55, 255]", tr);
 
-        // TODO: this is broken
         check_transform_e2e(30, "merge [0] [1]", tr);
+
+        check_transform_e2e(36, "
+            cut [0] [x] [150]
+            cut [0.1] [x] [190]
+            merge [0.0] [0.1.0]
+        ", tr);
+        check_transform_e2e(36, "
+            cut [0] [y] [150]
+            cut [0.1] [y] [190]
+            merge [0.0] [0.1.0]
+        ", tr);
+
+        // TODO: this test is broken
+        // check_transform_e2e(37, "
+        //     cut [0] [120, 130]
+        //     color [0.1] [123, 34, 55, 255]
+        // ", tr);
     }
 }
