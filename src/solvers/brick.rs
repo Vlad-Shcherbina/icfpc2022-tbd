@@ -1,5 +1,7 @@
 #![allow(unused_imports)]
 
+use std::collections::HashSet;
+use rand::prelude::*;
 use crate::util::project_path;
 use crate::basic::*;
 use crate::image::Image;
@@ -47,19 +49,61 @@ fn brick_solver() {
     eprintln!("{}", crate::stats::STATS.render());
 }
 
+fn random_seps() -> Vec<i32> {
+    let mut res: HashSet<i32> = HashSet::new();
+    if thread_rng().gen_bool(0.9) {
+        res.insert(0);
+        res.insert(400);
+    }
+    loop {
+        res.insert(thread_rng().gen_range(0..401));
+        if res.len() >= 2 && thread_rng().gen_bool(0.3) {
+            break;
+        }
+    }
+    let mut res: Vec<i32> = res.into_iter().collect();
+    res.sort();
+    res
+}
+
 fn solve(problem: &Problem) -> Vec<Move> {
     let _t = crate::stats_timer!("solve").time_it();
     let mut painter = PainterState::new(problem);
+
+    let (_, initial_moves) = seg_util::merge_all(&mut painter);
+
+    let mut best_moves = vec![];
+    let mut best_score = i64::MAX;
+
+    for _ in 0..200 {
+        let ys = random_seps();
+        let mut xss = vec![];
+        for _ in 1..ys.len() {
+            xss.push(random_seps());
+        }
+        let (score, moves) = do_bricks(problem, &initial_moves, ys, xss);
+        if score < best_score {
+            dbg!(score);
+            best_score = score;
+            best_moves = moves;
+        }
+    }
+
+    best_moves
+}
+
+fn do_bricks(problem: &Problem, initial_moves: &[Move], mut ys: Vec<i32>, mut xss: Vec<Vec<i32>>) -> (i64, Vec<Move>) {
+    let _t = crate::stats_timer!("do_bricks").time_it();
+    let mut painter = PainterState::new(problem);
     let mut all_moves = vec![];
 
-    let (mut block_id, moves) = seg_util::merge_all(&mut painter);
-    all_moves.extend(moves);
-
-    let mut ys = vec![10, 70, 110, 250, 350, 390];
-    let mut xss = vec![];
-    for _ in 1..ys.len() {
-        xss.push(vec![10, 70, 110, 250, 350, 390]);
+    for m in initial_moves {
+        painter.apply_move(m);
+        all_moves.push(m.clone());
     }
+
+    assert_eq!(painter.blocks.len(), 1);
+    let mut block_id = painter.blocks.keys().next().unwrap().clone();
 
     loop {
         let (new_block, moves) = seg_util::isolate_rect(&mut painter, block_id, Shape {
@@ -136,5 +180,8 @@ fn solve(problem: &Problem) -> Vec<Move> {
         block_id = new_block;
     }
 
-    all_moves
+    let img = painter.render();
+    let score = painter.cost + image_distance(&problem.target, &img).round() as i64;
+
+    (score, all_moves)
 }
