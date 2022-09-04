@@ -439,11 +439,29 @@ impl<'a> State<'a> {
         self.eval_custom_merge(actions, &MergeAllFast{})
     }
 
+    fn drop_trailing_non_edits(&self, moves: &mut Vec<Move>) {
+        while let Some(mv) = moves.last() {
+            let drop = match mv {
+                Move::PCut { .. } => { true }
+                Move::LCut { .. } => { true }
+                Move::ColorMove { .. } => { false }
+                Move::Swap { .. } => { false }
+                Move::Merge { .. } => { true }
+            };
+            if drop {
+                moves.pop();
+            } else {
+                break
+            }
+        }
+    }
+
     fn eval_custom_merge<M: MergeAll>(&mut self, actions: &Actions, merge: &M) -> (i64, Vec<Move>) {
         self.painter.snapshot();
         self.apply(actions, merge);
         let moves = &self.painter.moves;
-        let moves = color_util::adjust_colors(self.problem, moves);
+        let mut moves = color_util::adjust_colors(self.problem, moves);
+        self.drop_trailing_non_edits(&mut moves);
         let (painter_cost, painter_image) = self.reeval(&moves);
         self.painter.rollback();
         (painter_cost + image_distance(&painter_image, &self.problem.target) as i64, moves)
