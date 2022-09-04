@@ -1,0 +1,22 @@
+{
+    "width": 400,
+    "height": 400,
+    "sourcePng": "https://cdn.robovinci.xyz/sourcepngs/40.source.json",
+    "blocks": [
+        {
+            "blockId": "0",
+            "bottomLeft": [
+                0,
+                0
+            ],
+            "topRight": [
+                400,
+                400
+            ],
+            "color": [
+                0,
+                0
+            ]
+        }
+    ]
+}
