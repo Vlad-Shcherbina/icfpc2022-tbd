@@ -3,7 +3,7 @@ use crate::basic::*;
 use crate::basic::Move::PCut;
 use crate::invocation::{record_this_invocation, Status};
 use crate::uploader::upload_solution;
-use crate::solver_utils::gmedian_color;
+use crate::color_util::gmedian_color;
 
 struct State {
     img: Image,

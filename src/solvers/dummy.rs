@@ -22,7 +22,7 @@ fn dummy_solver() {
     let problem_id: i32 = args[0].parse().unwrap();
     let problem = Problem::load(problem_id);
 
-    let color = crate::solver_utils::optimal_color_for_block(
+    let color = crate::color_util::optimal_color_for_block(
         &problem.target, &Shape { x1: 0, y1: 0, x2: problem.target.width, y2: problem.target.height });
 
     let moves = vec![

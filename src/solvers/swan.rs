@@ -5,7 +5,7 @@ use crate::basic::*;
 use crate::image::Image;
 use crate::invocation::{record_this_invocation, Status};
 use crate::uploader::upload_solution;
-use crate::solver_utils::*;
+use crate::color_util::*;
 use crate::seg_util;
 
 use crate::basic::Move::*;

@@ -9,7 +9,7 @@ pub mod basic;
 mod solvers;
 mod image;
 mod uploader;
-mod solver_utils;
+mod color_util;
 mod seg_util;
 mod api;
 mod pack;
