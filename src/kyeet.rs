@@ -1,10 +1,8 @@
-use std::{cmp::Ordering, collections::HashMap, hash::BuildHasherDefault, vec};
-
-use fxhash::FxHasher;
+use std::{cmp::Ordering, collections::HashMap};
 
 use crate::{
     basic::{Color, Problem, Shape},
-    color_util::{best_from_palette, color_freqs, optimal_color_for_color_freqs},
+    color_util::{color_freqs, optimal_color_for_color_freqs},
     image::Image,
 };
 
@@ -44,7 +42,7 @@ fn kyeet_do(args: &KyeetArgs, problem: &Problem) -> Image {
     let scrape_colors_from: Image = problem
         .clone()
         .initial_img
-        .unwrap_or(problem.target.clone());
+        .unwrap_or_else(|| problem.target.clone());
 
     let cfs = color_freqs(
         &scrape_colors_from,
@@ -57,11 +55,11 @@ fn kyeet_do(args: &KyeetArgs, problem: &Problem) -> Image {
     );
 
     let mut centered: HashMap<Color, f64> = HashMap::default();
-    let mut cfs1 = cfs.clone();
+    let mut cfs1 = cfs;
     // let mut cfs1_ptr = &cfs1;
     let mut i = 0;
     eprintln!("! ({}) !", cfs1.len());
-    while cfs1.len() > 0 {
+    while !cfs1.is_empty() {
         // eprintln!("! ({}) !", cfs1.len());
         i += 1;
         if i % 100 == 0 {
