@@ -127,6 +127,18 @@ fn random_seps() -> Vec<i32> {
     res
 }
 
+fn mutate_sep(seps: &mut Vec<i32>) {
+    seps.remove(thread_rng().gen_range(0..seps.len()));
+    loop {
+        let x = thread_rng().gen_range(0..401);
+        if !seps.contains(&x) {
+            seps.push(x);
+            break;
+        }
+    }
+    seps.sort();
+}
+
 #[derive(Clone)]
 struct Blueprint {
     ys: Vec<i32>,
@@ -144,6 +156,15 @@ impl Blueprint {
     }
 
     fn mutate(&mut self) {
+        if thread_rng().gen_bool(0.3) {
+            let i = thread_rng().gen_range(0..self.xss.len());
+            mutate_sep(&mut self.xss[i]);
+            return;
+        }
+        if thread_rng().gen_bool(0.3) {
+            mutate_sep(&mut self.ys);
+            return;
+        }
         let i = thread_rng().gen_range(0..self.xss.len());
         self.xss[i] = random_seps();
     }
