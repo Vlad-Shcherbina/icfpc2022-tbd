@@ -13,6 +13,8 @@ struct Framework {
     rng: ThreadRng,
     state: State,
     uniform_action: UniformAction,
+    pop_size: usize,
+    pop_multiplier: usize,
 }
 
 struct UniformSubshape {
@@ -150,38 +152,105 @@ impl Distribution<Action> for UniformAction {
 }
 
 impl Framework {
-    fn new(problem: Problem) -> Framework {
+    fn new(problem: Problem, pop_size: usize, pop_multiplier: usize) -> Framework {
         let shape = Shape {x1: 0, y1: 0, x2: problem.width, y2: problem.height};
         Framework {
             state: State::new(problem),
             rng: rand::thread_rng(),
             uniform_action: UniformAction::new(shape),
+            pop_size,
+            pop_multiplier
         }
     }
 
-    fn random_actions(&mut self) -> Actions {
-        let mut result = vec![];
-        for _ in 0..10 {
-            result.push(self.uniform_action.sample(&mut self.rng))
+    // fn crossover(&mut self, action1: Actions, action2: Actions) -> Actions {
+    //     let split1 = Uniform::new(0, action1.0.len()).sample(&mut self.rng);
+    //     let split2 = Uniform::new(0, action2.0.len()).sample(&mut self.rng);
+    //     if self.rng.gen_bool(0.5) {
+    //         let mut actions = action1.0.split_at(split1).0.to_vec();
+    //         actions.extend(action2.0.split_at(split2).1.to_vec());
+    //         Actions(actions)
+    //     } else {
+    //         let mut actions = action2.0.split_at(split2).0.to_vec();
+    //         actions.extend(action1.0.split_at(split1).1.to_vec());
+    //         Actions(actions)
+    //     }
+    // }
+
+    // fn mutate_action(&mut self, action: &mut Action) {
+    //     match action {
+    //         Action::Color { shape, color } => {
+    //         }
+    //         Action::Swap { .. } => {}
+    //     }
+    // }
+
+    fn mutate_actions(&mut self, actions: &mut Actions) {
+        let choice = Uniform::new(0, 2).sample(&mut self.rng);
+        if choice == 0 || actions.0.is_empty() {
+            // add new action
+            let action = self.random_action();
+            let pos = Uniform::new(0, actions.0.len() + 1).sample(&mut self.rng);
+            actions.0.insert(pos, action);
+        } else if choice == 1 {
+            // remove
+            let pos = Uniform::new(0, actions.0.len()).sample(&mut self.rng);
+            actions.0.remove(pos);
+        } else {
+            panic!()
         }
-        Actions(result)
+
     }
 
-    fn run(&mut self) -> (i64, Vec<Move>) {
+    fn random_action(&mut self) -> Action {
+        self.uniform_action.sample(&mut self.rng)
+    }
+
+    // fn random_actions(&mut self) -> Actions {
+    //     let mut result = vec![];
+    //     for _ in 0..10 {
+    //         result.push(self.random_action())
+    //     }
+    //     Actions(result)
+    // }
+
+    fn run_one_generation(&mut self, gen: Vec<Actions>) -> Vec<Actions> {
+        let mut next_pop = gen.clone();
+        for _ in 0..self.pop_multiplier*self.pop_size {
+            let mut a = gen.choose(&mut self.rng).unwrap().clone();
+            self.mutate_actions(&mut a);
+            next_pop.push(a);
+        }
+        let mut results: Vec<(i64, Actions)> = next_pop.into_iter().map(|a| {
+            (self.state.eval(&a).0, a)
+        }).collect();
+        results.sort_by(|(cost1, _actions1), (cost2, _actions2)| {
+            cost1.cmp(cost2)
+        });
+        results.into_iter().map(|(_cost, actions)| {
+            actions
+        }).take(self.pop_size).collect()
+    }
+
+    fn run<F: Fn(Vec<Move>)>(&mut self, callback: F) -> (i64, Vec<Move>) {
         let (mut best, mut best_moves) = self.state.eval(&Actions(vec![]));
-        for _ in 0..10 {
-            let actions = self.random_actions();
-            let (res, moves) = self.state.eval(&actions);
-            println!("SCORE {}", res);
+        let mut population = vec![Actions(vec![])];
+        for gen in 0.. {
+            population = self.run_one_generation(population);
+            let (res, moves) = self.state.eval(&population[0]);
+            println!("GEN {} SCORE {}", gen, res);
             if res < best {
+                println!("NEW BEST!");
                 best = res;
-                best_moves = moves;
+                best_moves = moves.clone();
+                callback(moves);
             }
         }
         (best, best_moves)
     }
 }
 
+#[derive(Clone)]
 enum Action {
     Color {
         shape: Shape, color: Color,
@@ -191,6 +260,7 @@ enum Action {
     },
 }
 
+#[derive(Clone)]
 struct Actions (pub Vec<Action>);
 
 struct State {
@@ -299,24 +369,24 @@ fn ga_solver() {
     //         shape2: Shape {x1: 300, y1: 200, x2: 310, y2: 210},
     //     }
     // ]));
-    let mut framework = Framework::new(problem.clone());
-    let (cost, moves) = framework.run();
-    println!("cost {}", cost);
-    // assert!(painter.blocks.len() == 1);
 
-    let mut painter = PainterState::new(&problem);
-    moves.into_iter().for_each(|mv| {painter.apply_move(&mv);});
+    let new_best_callback = |moves: Vec<Move>| {
+        let mut painter = PainterState::new(&problem);
+        moves.into_iter().for_each(|mv| {painter.apply_move(&mv);});
+        let img = painter.render();
+        eprintln!();
+        eprintln!("cost: {}", painter.cost);
+        let dist = image_distance(&img, &problem.target);
+        eprintln!("distance to target: {}", dist);
+        eprintln!("final score: {}", dist.round() as i64 + painter.cost);
 
-    let img = painter.render();
-    eprintln!();
-    eprintln!("cost: {}", painter.cost);
-    let dist = image_distance(&img, &problem.target);
-    eprintln!("distance to target: {}", dist);
-    eprintln!("final score: {}", dist.round() as i64 + painter.cost);
+        let output_path = format!("outputs/ga_{}.png", problem_id);
+        img.save(&crate::util::project_path(&output_path));
+        eprintln!("saved to {}", output_path);
+    };
 
-    let output_path = format!("outputs/ga_{}.png", problem_id);
-    img.save(&crate::util::project_path(&output_path));
-    eprintln!("saved to {}", output_path);
+    let mut framework = Framework::new(problem.clone(), 10, 10);
+    framework.run(new_best_callback);
 
     // let mut client = crate::db::create_client();
     // let mut tx = client.transaction().unwrap();
