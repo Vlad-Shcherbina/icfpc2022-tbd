@@ -19,6 +19,7 @@ OBJECT_FILES +=	\
 	fsfont.o \
 	intcoord.o \
 	isl.o \
+	islseq.o \
 	file.o \
 	hashtable.o \
 	list.o \
@@ -32,7 +33,7 @@ OBJECT_FILES +=	\
 	xowin.o
 
 LIBS+=
-CFLAGS= -O0 -g -Wall
+CFLAGS= -O0 -g -march=native -Wall
 CC=gcc
 DEFINES+=-DCMOD_DEBUG_MEMORY 
 

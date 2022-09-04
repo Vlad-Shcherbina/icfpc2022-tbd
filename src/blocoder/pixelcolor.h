@@ -4,11 +4,15 @@
 
 #include "cmod.h"
 
-typedef struct {
-   unsigned char b;
-   unsigned char g;
-   unsigned char r;
-   unsigned char a;
+typedef union {
+    struct __attribute__((packed)) {
+        unsigned char b;
+        unsigned char g;
+        unsigned char r;
+        unsigned char a;
+   };
+   u32 dword;
+   u8 v[4];
 } __attribute__((packed)) PixelColor;
 
 extern const PixelColor pixelcolor_black;
@@ -33,7 +37,7 @@ extern const PixelColor pixelcolor_brightmagenta;
 void        PixelColor_Init(PixelColor *dst, PixelColor *org);
 //PixelColor  PixelColor_FromRGB(int r, int g, int b);
 PixelColor  PixelColor_FromRGBA(int r, int g, int b, int a);
-#define     PixelColor_FromRGB(r,g,b) PixelColor_FromRGBA(r,g,b,0)
+#define     PixelColor_FromRGB(r,g,b) PixelColor_FromRGBA(r,g,b,255)
 #define     PixelColor_Construct PixelColor_FromRGB
 PixelColor  PixelColor_Mix(PixelColor a, PixelColor b, float weight); // 1.0 == 100% from a
 PixelColor  PixelColor_Blend256(PixelColor a, PixelColor b, unsigned int w); // w=256 == 100% a

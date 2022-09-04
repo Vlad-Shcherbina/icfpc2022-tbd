@@ -13,6 +13,7 @@ typedef struct {
 } BlocUndo;
 
 BlocUndo *BlocUndo_Create(void);
+void BlocUndo_Restore(BlocUndo *undo);
 void BlocUndo_Destroy(BlocUndo *undo);
 
 #ifdef CMOD_NOMAKEFILE

@@ -22,7 +22,7 @@ void BlockData_UpdateBBox(BlockData *parent) {
     int xmin = BlockData_X(parent, 0);
     int ymin = BlockData_Y(parent, 0);
     int xmax = xmin;
-    int ymax = xmax;
+    int ymax = ymin;
     for (int i=1; i<BlockData_NofCoords(parent); i++) {
         if (BlockData_X(parent, i) < xmin) xmin = BlockData_X(parent, i);
         else
@@ -65,9 +65,9 @@ BlockData *BlockData_CreateMerge(const BlockData *b1, const BlockData *b2) {
             if (BlockData_X(parent[j], i) < xmin) xmin = BlockData_X(parent[j], i);
             else
             if (BlockData_X(parent[j], i) > xmax) xmax = BlockData_X(parent[j], i);
-            if (BlockData_Y(parent[j], i) < ymin) xmin = BlockData_Y(parent[j], i);
+            if (BlockData_Y(parent[j], i) < ymin) ymin = BlockData_Y(parent[j], i);
             else
-            if (BlockData_Y(parent[j], i) > ymax) ymax = BlockData_X(parent[j], i);
+            if (BlockData_Y(parent[j], i) > ymax) ymax = BlockData_Y(parent[j], i);
         }
     }
     bl->id.qword = 0ULL;
@@ -84,6 +84,15 @@ BlockData *BlockData_CreateMerge(const BlockData *b1, const BlockData *b2) {
     return bl;
 }
 
+BlockData *BlockData_Clone(const BlockData *b) {
+    BlockData *ret = Memory_Reserve(1, BlockData);
+    Memory_Copy(ret, b, sizeof(BlockData));
+    ret->nof_coords = b->nof_coords;
+    ret->alloced_coords = b->alloced_coords;
+    ret->coord = Memory_Reserve(ret->alloced_coords, IntCoord);
+    Memory_Copy(ret->coord, b->coord, ret->nof_coords*sizeof(IntCoord));
+    return ret;
+}
 
 void BlockData_Destroy(BlockData *bd) {
     Memory_Free(bd->coord, IntCoord);

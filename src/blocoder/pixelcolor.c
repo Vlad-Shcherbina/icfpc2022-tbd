@@ -5,25 +5,27 @@
 #include "stdtypes.h"
 
 #include <stdio.h>
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmissing-braces"
+const PixelColor pixelcolor_black = {0,0,0,255};
+const PixelColor pixelcolor_blue = {200,0,0,255};
+const PixelColor pixelcolor_green = {0,200,0,255};
+const PixelColor pixelcolor_cyan = {200,200,0,255};
+const PixelColor pixelcolor_red = {0,0,200,255};
+const PixelColor pixelcolor_magenta = {200,0,200,255};
+const PixelColor pixelcolor_yellow = {0,255,255,255};
+const PixelColor pixelcolor_white = {255,255,255,255};
+const PixelColor pixelcolor_gray = {160, 160, 160, 255};
+const PixelColor pixelcolor_darkgray = {80,80,80, 255};
+const PixelColor pixelcolor_lightgray = {210, 210, 210, 255};
+const PixelColor pixelcolor_brown = {0, 120, 130, 255};
 
-const PixelColor pixelcolor_black = {0,0,0,0};
-const PixelColor pixelcolor_blue = {200,0,0,0};
-const PixelColor pixelcolor_green = {0,200,0,0};
-const PixelColor pixelcolor_cyan = {200,200,0,0};
-const PixelColor pixelcolor_red = {0,0,200,0};
-const PixelColor pixelcolor_magenta = {200,0,200,0};
-const PixelColor pixelcolor_yellow = {0,255,255,0};
-const PixelColor pixelcolor_white = {255,255,255,0};
-const PixelColor pixelcolor_gray = {160, 160, 160, 0};
-const PixelColor pixelcolor_darkgray = {80,80,80, 0};
-const PixelColor pixelcolor_lightgray = {210, 210, 210, 0};
-const PixelColor pixelcolor_brown = {0, 120, 130, 0};
-
-const PixelColor pixelcolor_brightblue = {255,50,50,0};
-const PixelColor pixelcolor_brightgreen = {50,255,50,0};
-const PixelColor pixelcolor_brightcyan = {255,255,50,0};
-const PixelColor pixelcolor_brightred = {50,50,255,0};
-const PixelColor pixelcolor_brightmagenta = {255,50,255,0};
+const PixelColor pixelcolor_brightblue = {255,50,50,255};
+const PixelColor pixelcolor_brightgreen = {50,255,50,255};
+const PixelColor pixelcolor_brightcyan = {255,255,50,255};
+const PixelColor pixelcolor_brightred = {50,50,255,255};
+const PixelColor pixelcolor_brightmagenta = {255,50,255,255};
+#pragma GCC diagnostic pop
 
 /* --------------------------------------------------------------------- */
 

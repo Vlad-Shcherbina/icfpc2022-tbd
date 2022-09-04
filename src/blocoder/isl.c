@@ -1,9 +1,18 @@
 
+#include "blockdata.h"
 #include "isl.h"
+#include "memory.h"
+#include "stdtypes.h"
 #include "string.h"
 #include <stdio.h>
 
-const int isl_cost[ISL_NOF] = { 10, 7, 5, 3, 1 };
+const int isl_cost[ISL_NOF] = { 
+    [ISL_PCUT] = 10, 
+    [ISL_LCUT] = 7, 
+    [ISL_COLOR] = 5, 
+    [ISL_SWAP] = 3, 
+    [ISL_MERGE] = 1 
+};
 
 /*--------------------------------------------------------------------------*/
 
@@ -44,7 +53,7 @@ String *blockid_str(blockid id) {
 
 /*--------------------------------------------------------------------------*/
 
-String *ISL_ToString(ISL *isl) {
+String *ISL_ToString(const ISL *isl) {
     switch (isl->opcode) {
     case ISL_PCUT:
         return String_CreatePrintf("cut [%s] [%i,%i]", blockid_str(isl->pcut.id), isl->pcut.x, isl->pcut.y);
@@ -60,6 +69,85 @@ String *ISL_ToString(ISL *isl) {
         return String_CreatePrintf("# unknown opcode 0x%02x\n", isl->opcode);
     }
 }
+
+/*--------------------------------------------------------------------------*/
+
+void ISL_Print(const ISL *isl) {
+    String *s = ISL_ToString(isl);
+    printf("%s", s);
+    String_Destroy(s);
+}
+
+/*--------------------------------------------------------------------------*/
+#if 0
+void ISL_LCut(ISL *isl, const BlockData *bd, int o, int l) {
+    isl->opcode = ISL_LCUT;
+    isl->lcut.id = bd->id;
+    isl->lcut.orientation = o;
+    isl->lcut.l = l;
+}
+
+/*--------------------------------------------------------------------------*/
+
+void ISL_PCut(ISL *isl, const BlockData *bd, int x, int y) {
+    isl->opcode = ISL_PCUT;
+    isl->pcut.id = bd->id;
+    isl->pcut.x = x;
+    isl->pcut.y = y;
+}
+
+/*--------------------------------------------------------------------------*/
+
+void ISL_Paint(ISL *isl, const BlockData *bd, PixelColor a) {
+    isl->opcode = ISL_COLOR;
+    isl->color.id = bd->id;
+    isl->color.col = a;
+}
+#endif
+
+/*--------------------------------------------------------------------------*/
+
+void ISL_LCut(ISL *isl, blockid bid, int o, int l) {
+    isl->opcode = ISL_LCUT;
+    isl->lcut.id = bid;
+    isl->lcut.orientation = o;
+    isl->lcut.l = l;
+}
+
+/*--------------------------------------------------------------------------*/
+
+void ISL_PCut(ISL *isl, blockid bid, int x, int y) {
+    isl->opcode = ISL_PCUT;
+    isl->pcut.id = bid;
+    isl->pcut.x = x;
+    isl->pcut.y = y;
+}
+
+/*--------------------------------------------------------------------------*/
+
+void ISL_Paint(ISL *isl, blockid bid, PixelColor a) {
+    isl->opcode = ISL_COLOR;
+    isl->color.id = bid;
+    isl->color.col = a;
+}
+
+/*--------------------------------------------------------------------------*/
+
+Bool ISL_IsEqualPaint(ISL *isl1, ISL *isl2) {
+    return isl1->opcode == isl2->opcode && isl1->color.id.qword == isl2->color.id.qword && isl1->color.col.dword == isl2->color.col.dword;
+}
+
+/*--------------------------------------------------------------------------*/
+
+ISL *ISL_Clone(const ISL *isl_org) {
+    ISL *isl = Memory_Reserve(1, ISL);
+    *isl = *isl_org;
+    return isl;
+}
+
+/*--------------------------------------------------------------------------*/
+
+void ISL_Destroy(ISL *isl) { Memory_Free(isl, ISL); }
 
 /*--------------------------------------------------------------------------*/
 

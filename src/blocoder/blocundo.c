@@ -11,8 +11,12 @@ BlocUndo *BlocUndo_Create(void) {
     return undo;
 }
 
-void BlocUndo_Destroy(BlocUndo *undo) {
+void BlocUndo_Restore(BlocUndo *undo) {
     if (undo->bg != NULL) BitMap_Destroy(undo->bg);
+}
+
+void BlocUndo_Destroy(BlocUndo *undo) {
+    BlocUndo_Restore(undo);
     Memory_Free(undo, BlocUndo);
 }
 
