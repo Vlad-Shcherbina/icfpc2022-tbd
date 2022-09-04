@@ -2,21 +2,22 @@
 
 extern crate core;
 
-mod util;
+mod api;
+pub mod basic;
+mod color_util;
 mod dashboard;
 mod db;
-mod invocation;
-mod print_invocations;
-pub mod basic;
-mod solvers;
 mod image;
-mod uploader;
-mod color_util;
-mod seg_util;
-mod api;
+mod invocation;
+mod kyeet;
 mod pack;
+mod print_invocations;
+mod seg_util;
+mod solvers;
 mod stats;
 mod transform;
+mod uploader;
+mod util;
 
 crate::entry_point!("hello", hello);
 fn hello() {

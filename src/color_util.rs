@@ -2,9 +2,9 @@
 #![allow(unused_imports)]
 #![allow(clippy::needless_range_loop)]
 
+use rand::prelude::*;
+use rand::prelude::*;
 use std::collections::{HashMap, HashSet};
-use rand::prelude::*;
-use rand::prelude::*;
 
 use crate::basic::*;
 use crate::image::Image;
@@ -65,7 +65,7 @@ fn modified_weiszfeld(color_freqs: &HashMap<Color, f64>, iterations: i32) -> Col
                 let t = c.0[j] as f64 - y[j];
                 d += t * t;
             }
-            if d < 1e-30  {
+            if d < 1e-30 {
                 assert!(collision.is_none());
                 collision = Some(i);
                 weights[i] = 0.0;
@@ -77,7 +77,9 @@ fn modified_weiszfeld(color_freqs: &HashMap<Color, f64>, iterations: i32) -> Col
         let sum = weights.iter().sum::<f64>();
         let inv_sum = 1.0 / sum;
         assert!(inv_sum.is_finite());
-        for w in &mut weights { *w *= inv_sum; }
+        for w in &mut weights {
+            *w *= inv_sum;
+        }
         y = [0f64; 4];
         for (i, &(c, _)) in color_freqs_vec.iter().enumerate() {
             for j in 0..4 {
@@ -88,7 +90,9 @@ fn modified_weiszfeld(color_freqs: &HashMap<Color, f64>, iterations: i32) -> Col
         if let Some(collision) = collision {
             let mut rs = [0f64; 4];
             for (i, &(c, freq)) in color_freqs_vec.iter().enumerate() {
-                if i == collision { continue; }
+                if i == collision {
+                    continue;
+                }
                 let mut d = 0f64;
                 for j in 0..4 {
                     let t = c.0[j] as f64 - y[j];
@@ -109,7 +113,8 @@ fn modified_weiszfeld(color_freqs: &HashMap<Color, f64>, iterations: i32) -> Col
                 r += rs[j] * rs[j];
             }
             let r = r.sqrt();
-            if r > 1e-30 {  // hack
+            if r > 1e-30 {
+                // hack
                 assert!(r > 1e-30);
                 let freq = color_freqs_vec[collision].1;
                 let alpha = (freq / r).min(1.0);
@@ -190,9 +195,9 @@ pub fn optimal_color_for_block(pic: &Image, shape: &Shape) -> Color {
 }
 
 pub fn best_from_palette(color_freqs: &HashMap<Color, f64>, palette: &[Color]) -> usize {
-    (0..palette.len()).min_by_key(
-        |&i| (1000.0 * dist_to_color_freqs(color_freqs, palette[i])).round() as i64,
-    ).unwrap()
+    (0..palette.len())
+        .min_by_key(|&i| (1000.0 * dist_to_color_freqs(color_freqs, palette[i])).round() as i64)
+        .unwrap()
 }
 
 pub fn k_means(color_freqss: &[HashMap<Color, f64>], num_clusters: usize) -> Vec<Color> {
@@ -237,12 +242,7 @@ fn test_modified_weiszfeld() {
     for _ in 0..1000 {
         let mut color_freqs: HashMap<Color, f64> = HashMap::default();
         for _ in 0..rng.gen_range(1..10) {
-            let c = Color([
-                rng.gen(),
-                rng.gen(),
-                rng.gen(),
-                rng.gen(),
-            ]);
+            let c = Color([rng.gen(), rng.gen(), rng.gen(), rng.gen()]);
             let freq = rng.gen_range(1..1000) as f64;
             *color_freqs.entry(c).or_default() += freq;
         }
@@ -286,7 +286,10 @@ pub fn mean_color(img: &Image, shape: Shape) -> Color {
     for x in shape.x1..shape.x2 {
         for y in shape.y1..shape.y2 {
             let p = img.get_pixel(x, y);
-            r += p.0[0] as u32; g += p.0[1] as u32; b += p.0[2] as u32; a += p.0[3] as u32;
+            r += p.0[0] as u32;
+            g += p.0[1] as u32;
+            b += p.0[2] as u32;
+            a += p.0[3] as u32;
             pixels += 1;
         }
     }
@@ -307,9 +310,10 @@ pub fn adjust_colors(problem: &Problem, moves: &Vec<Move>) -> Vec<Move> {
             color_moves.insert(color);
         }
     }
-    let mut freqs: HashMap<Color, HashMap<Color, f64>> = color_moves.into_iter().map(|color| {
-        (*color, HashMap::new())
-    }).collect();
+    let mut freqs: HashMap<Color, HashMap<Color, f64>> = color_moves
+        .into_iter()
+        .map(|color| (*color, HashMap::new()))
+        .collect();
     let img = painter.render();
     for x in 0..img.width {
         for y in 0..img.height {
@@ -319,15 +323,18 @@ pub fn adjust_colors(problem: &Problem, moves: &Vec<Move>) -> Vec<Move> {
             }
         }
     }
-    let new_colors: HashMap<Color, Color> = freqs.into_iter().map(|(color, freq)| {
-        (color, optimal_color_for_color_freqs(&freq))
-    }).collect();
-    moves.iter().map(|mv| {
-        match mv {
-            Move::ColorMove { block_id, color } => {
-                Move::ColorMove {block_id: block_id.clone(), color: new_colors[color]}
-            }
-            _ => mv.clone()
-        }
-    }).collect()
+    let new_colors: HashMap<Color, Color> = freqs
+        .into_iter()
+        .map(|(color, freq)| (color, optimal_color_for_color_freqs(&freq)))
+        .collect();
+    moves
+        .iter()
+        .map(|mv| match mv {
+            Move::ColorMove { block_id, color } => Move::ColorMove {
+                block_id: block_id.clone(),
+                color: new_colors[color],
+            },
+            _ => mv.clone(),
+        })
+        .collect()
 }
