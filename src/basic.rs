@@ -409,7 +409,14 @@ impl Block {
             }
             let sub_pic = match &p.1 {
                 Pic::Unicolor(c) => Pic::Unicolor(*c),
-                _ => todo!(),
+                Pic::Bitmap(s) => {
+                    Pic::Bitmap(Shape {
+                        x1: s.x1 + shape.x1 - p.0.x1,
+                        y1: s.y1 + shape.y1 - p.0.y1,
+                        x2: s.x2 + shape.x2 - p.0.x2,
+                        y2: s.y2 + shape.y2 - p.0.y2,
+                    })
+                }
             };
             pieces.push((
                 Shape {
@@ -453,8 +460,18 @@ enum PainterStateAction {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+struct BaseCosts {
+    pub lcut: i32,
+    pub pcut: i32,
+    pub merge: i32,
+    pub swap: i32,
+    pub color: i32,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PainterState<'a> {
     initial_img: Option<&'a Image>,
+    base_costs: BaseCosts,
     width: i32,
     height: i32,
     next_id: usize,
@@ -478,6 +495,7 @@ impl<'a> PainterState<'a> {
         let next_id = p.start_blocks.iter().map(|(id, _)| id.0[0]).max().unwrap() + 1;
         PainterState {
             initial_img: p.initial_img.as_ref(),
+            base_costs: p.base_costs.clone(),
             width: p.width,
             height: p.height,
             next_id,
@@ -538,7 +556,7 @@ impl<'a> PainterState<'a> {
                     new_block_ids.push(new_block_id.clone());
                     self.blocks.insert(new_block_id, new_block);
                 }
-                base_cost = 10;
+                base_cost = self.base_costs.pcut;
                 block_size = block.shape.size();
             }
             LCut { block_id, orientation, line_number } => {
@@ -551,21 +569,21 @@ impl<'a> PainterState<'a> {
                     new_block_ids.push(new_block_id.clone());
                     self.blocks.insert(new_block_id, new_block);
                 }
-                base_cost = 7;
+                base_cost = self.base_costs.lcut;
                 block_size = block.shape.size();
             }
             Move::ColorMove { block_id, color } => {
                 let block = self.blocks.get_mut(block_id).unwrap();
                 actions.push(ColorBlock { block_id: block_id.clone(), old_block: block.clone() });
                 block.pieces = vec![(block.shape, Pic::Unicolor(*color))];
-                base_cost = 5;
+                base_cost = self.base_costs.color;
                 block_size = block.shape.size();
             }
             Swap { block_id1, block_id2 } => {
                 let mut block1 = self.blocks.remove(block_id1).unwrap();
                 let mut block2 = self.blocks.remove(block_id2).unwrap();
                 swap_blocks(&mut block1, &mut block2);
-                base_cost = 3;
+                base_cost = self.base_costs.swap;
                 block_size = block1.shape.size();
                 self.blocks.insert(block_id1.clone(), block1);
                 self.blocks.insert(block_id2.clone(), block2);
@@ -583,7 +601,7 @@ impl<'a> PainterState<'a> {
                 };
                 new_block.pieces.extend(block2.pieces);
 
-                base_cost = 1;
+                base_cost = self.base_costs.merge;
                 block_size = block1.shape.size().max(block2.shape.size());
 
                 let new_block_id = BlockId::root(self.next_id);
@@ -757,7 +775,10 @@ struct InitialBlock {
     bottom_left: (i32, i32),
     #[serde(rename = "topRight")]
     top_right: (i32, i32),
-    color: Vec<i32>,
+
+    color: Option<[u8; 4]>,
+    #[serde(rename = "pngBottomLeftPoint")]
+    bottom_left_point: Option<(i32, i32)>,
 }
 
 #[derive(Clone)]
@@ -767,6 +788,7 @@ pub struct Problem {
     pub initial_img: Option<Image>,
     pub target: Image,
     start_blocks: Vec<(BlockId, Block)>,
+    base_costs: BaseCosts,
 }
 
 impl Problem {
@@ -793,16 +815,14 @@ impl Problem {
                     x2: b.top_right.0,
                     y2: b.top_right.1,
                 };
-                let pic = if b.color.len() == 4 {
-                    Pic::Unicolor(Color([
-                        b.color[0].try_into().unwrap(),
-                        b.color[1].try_into().unwrap(),
-                        b.color[2].try_into().unwrap(),
-                        b.color[3].try_into().unwrap(),
-                    ]))
+                let pic = if let Some(color) = b.color {
+                    assert!(b.bottom_left_point.is_none());
+                    Pic::Unicolor(Color(color))
                 } else {
-                    assert_eq!(shape.x1, b.color[0]);
-                    assert_eq!(shape.y1, b.color[1]);
+                    assert!(initial_img.is_some());
+                    let (x1, y1) = b.bottom_left_point.unwrap();
+                    assert_eq!(shape.x1, x1);
+                    assert_eq!(shape.y1, y1);
                     Pic::Bitmap(shape)
                 };
                 start_blocks.push((block_id, Block {
@@ -819,7 +839,26 @@ impl Problem {
             initial_img = None;
         }
 
+        let base_costs = if problem_id >= 36 {
+            BaseCosts {
+                lcut: 2,
+                pcut: 3,
+                color: 5,
+                swap: 3,
+                merge: 1,
+            }
+        } else {
+            BaseCosts {
+                lcut: 7,
+                pcut: 10,
+                color: 5,
+                swap: 3,
+                merge: 1,
+            }
+        };
+
         Problem {
+            base_costs,
             width: target.width,
             height: target.height,
             target,
@@ -840,12 +879,13 @@ fn render_moves_example() {
         //     block_id: BlockId::root(0),
         //     color: Color([0, 74, 173, 255]),
         // },
-        /*PCut {
+        PCut {
             block_id: BlockId::root(0),
-            x: 360,
-            y: 40
+            x: 200,
+            y: 200
         },
-        Move::ColorMove {
+        Swap { block_id1: BlockId::root(0).child(0), block_id2: BlockId::root(0).child(1) },
+        /*Move::ColorMove {
             block_id: BlockId::root(0).child(3),
             color: Color([128, 128, 128, 255]),
         },*/
@@ -924,6 +964,10 @@ fn check_score(problem_id: i32, sol: &str, expected_cost: i64, expected_dist: i6
 #[test]
 // Total score was compared with the official validator.
 fn test_score_calculation() {
+    // initial canvas with a bitmap
+    check_score(36, "", 0, 71523, 71523);
+    check_score(36, "cut [0] [120, 170]", 3, 71523, 71526);
+
     // initial canvas
     check_score(29, "color [0] [0, 74, 173, 255]", 500, 117035, 117535);
 
