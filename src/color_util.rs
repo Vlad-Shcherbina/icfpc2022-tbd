@@ -169,7 +169,7 @@ fn climb(color_freqs: &HashMap<Color, f64>, mut color: Color) -> Color {
     }
 }
 
-fn optimal_color_for_color_freqs(color_freqs: &HashMap<Color, f64>) -> Color {
+pub fn optimal_color_for_color_freqs(color_freqs: &HashMap<Color, f64>) -> Color {
     let color = modified_weiszfeld(color_freqs, 10);
     climb(color_freqs, color)
 }
