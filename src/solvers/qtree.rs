@@ -60,7 +60,7 @@ impl State {
         let recolor_cost = self.qtree_stop_here_recolor_cost(shape, block_id.clone());
         let no_recolor_cost = self.qtree_stop_here_no_recolor_cost(shape);
 
-        println!("In {} (aka block {}): repaint {}, no-op: {}, split: {}", shape, block_id, recolor_cost, no_recolor_cost, split_here);
+        //println!("In {} (aka block {}): repaint {}, no-op: {}, split: {}", shape, block_id, recolor_cost, no_recolor_cost, split_here);
         let (opt_moves, opt) = if no_recolor_cost > recolor_cost {
             (vec![Move::ColorMove { block_id: block_id.clone(), color: self.average_color(shape) }], recolor_cost)
         } else {
@@ -68,7 +68,7 @@ impl State {
         };
 
         if split_here > opt {
-            println!("Splitting is too expensive at {} (block {}): {} > {}", shape, block_id, split_here, opt);
+            //println!("Splitting is too expensive at {} (block {}): {} > {}", shape, block_id, split_here, opt);
             return (opt_moves, opt)
         }
 
