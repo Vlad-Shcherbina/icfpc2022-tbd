@@ -106,14 +106,16 @@ fn modified_weiszfeld(color_freqs: &HashMap<Color, f64>, iterations: i32) -> Col
                 r += rs[j] * rs[j];
             }
             let r = r.sqrt();
-            assert!(r > 1e-30);
-            let freq = color_freqs_vec[collision].1;
-            let alpha = (freq / r).min(1.0);
-            assert!(alpha.is_finite());
+            if r > 1e-30 {
+                assert!(r > 1e-30);
+                let freq = color_freqs_vec[collision].1;
+                let alpha = (freq / r).min(1.0);
+                assert!(alpha.is_finite());
 
-            let c = color_freqs_vec[collision].0;
-            for j in 0..4 {
-                y[j] = (1.0 - alpha) * y[j] + alpha * c.0[j] as f64;
+                let c = color_freqs_vec[collision].0;
+                for j in 0..4 {
+                    y[j] = (1.0 - alpha) * y[j] + alpha * c.0[j] as f64;
+                }
             }
         }
 
