@@ -201,8 +201,14 @@ run.addEventListener('click', async () => {
     image.crossOrigin = "Anonymous";
     const base_costs = initialCanvas.sourcePngPNG != null ? base_costs_adjusted : base_costs_normal;
     if (initialCanvas.sourcePngPNG != null) {
-        image.src = initialCanvas.sourcePngPNG;
-        await new Promise((resolve) => {image.onload = resolve});
+        try {
+            image.src = initialCanvas.sourcePngPNG.replace(/.*\//, "/data/problems/");
+            await new Promise((resolve, reject) => {image.onload = resolve; image.onerror=reject});
+        } catch (e) {
+            console.error(e);
+            image.src = initialCanvas.sourcePngPNG;
+            await new Promise((resolve, reject) => {image.onload = resolve; image.onerror=reject});
+        }
     }
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = image.width;
