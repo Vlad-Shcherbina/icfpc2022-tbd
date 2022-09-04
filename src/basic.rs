@@ -967,6 +967,16 @@ fn test_score_calculation() {
     // initial canvas with a bitmap
     check_score(36, "", 0, 71523, 71523);
     check_score(36, "cut [0] [120, 170]", 3, 71523, 71526);
+    check_score(36, "
+        cut [0] [200, 200]
+        swap [0.0] [0.1]
+    ", 15, 83031, 83046);
+    check_score(36, "
+        cut [0] [200, 200]
+        merge [0.0] [0.1]
+    ", 7, 71523, 71530);
+    check_score(36, "cut [0] [x] [70]", 2, 71523, 71525);
+    check_score(36, "color [0] [123, 22, 71, 55]", 5, 192218, 192223);
 
     // initial canvas
     check_score(29, "color [0] [0, 74, 173, 255]", 500, 117035, 117535);
