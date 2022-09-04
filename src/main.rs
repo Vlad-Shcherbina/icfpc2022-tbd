@@ -1,5 +1,7 @@
 #![feature(let_else)]
 
+extern crate core;
+
 mod util;
 mod dashboard;
 mod db;

@@ -169,7 +169,7 @@ impl Framework {
 
     fn run(&mut self) -> (i64, Vec<Move>) {
         let (mut best, mut best_moves) = self.state.eval(&Actions(vec![]));
-        for _ in 0..100 {
+        for _ in 0..10 {
             let actions = self.random_actions();
             let (res, moves) = self.state.eval(&actions);
             println!("SCORE {}", res);
@@ -202,7 +202,7 @@ struct State {
 impl State {
     fn new(problem: Problem) -> State {
         let mut painter = PainterState::new(&problem);
-        let (root_id, _) = seg_util::merge_all(&mut painter);
+        let (root_id, _) = seg_util::merge_all_2(&mut painter);
         State {
             problem,
             root_id,
@@ -227,7 +227,7 @@ impl State {
                 Action::Color { shape, color } => {
                     let (block_id, _) = seg_util::isolate_rect(&mut self.painter, root_id, *shape);
                     self.painter.apply_move(&Move::ColorMove { block_id, color: *color });
-                    let (new_root, _) = seg_util::merge_all(&mut self.painter);
+                    let (new_root, _) = seg_util::merge_all_2(&mut self.painter);
                     root_id = new_root;
                 }
                 Action::Swap { shape1, shape2 } => {
@@ -272,7 +272,7 @@ impl State {
                     let (block_id1, _) = seg_util::isolate_rect(&mut self.painter, res.new_block_ids[0].clone(), *s1);
                     let (block_id2, _) = seg_util::isolate_rect(&mut self.painter, res.new_block_ids[1].clone(), *s2);
                     self.painter.apply_move(&Move::Swap { block_id1, block_id2 });
-                    root_id = seg_util::merge_all(&mut self.painter).0;
+                    root_id = seg_util::merge_all_2(&mut self.painter).0;
                 }
             }
         }

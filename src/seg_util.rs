@@ -179,6 +179,42 @@ pub fn merge_all(p: &mut PainterState) -> (BlockId, Vec<Move>) {
     (root_id, moves)
 }
 
+
+pub fn merge_all_2(p: &mut PainterState) -> (BlockId, Vec<Move>) {
+    let mut moves = vec![];
+    let mut id = p.blocks.keys().next().unwrap().clone();
+
+    fn next_merge<'a>(items: &mut [(&'a BlockId, &'a Block)]) -> (&'a BlockId, &'a BlockId) {
+        items.sort_by(|e1, e2 | {
+            e1.1.shape.size().cmp(&e2.1.shape.size())
+        });
+        for x in items.iter() {
+            for y in items.iter() {
+                if merge_shapes(x.1.shape, y.1.shape).is_some() {
+                    return (x.0, y.0)
+                }
+            }
+        }
+        panic!()
+    }
+
+    while p.blocks.len() > 1 {
+        let mut shapes = vec![];
+        for (block_id, block) in &p.blocks {
+            shapes.push((block_id, block))
+        }
+        let (b1, b2) = next_merge(&mut shapes);
+        let mv = Merge {
+            block_id1: b1.clone(),
+            block_id2: b2.clone(),
+        };
+        let ids = p.apply_move(&mv).new_block_ids;
+        moves.push(mv);
+        id = ids[0].clone();
+    }
+    (id, moves)
+}
+
 crate::entry_point!("seg_demo", seg_demo);
 fn seg_demo() {
     let problem = Problem::load(1);
@@ -199,7 +235,22 @@ fn check_isolate_rect(rect: Shape) {
     assert_eq!(root_shape, rect);
 
     merge_all(&mut painter);
+    assert_eq!(painter.blocks.len(), 1);
 }
+
+#[cfg(test)]
+fn check_isolate_rect_2(rect: Shape) {
+    let problem = Problem::load(1);
+    let mut painter = PainterState::new(&problem);
+
+    let (root_id, _moves) = isolate_rect(&mut painter, BlockId::root(0), rect);
+    let root_shape = painter.blocks[&root_id].shape;
+    assert_eq!(root_shape, rect);
+
+    merge_all_2(&mut painter);
+    assert_eq!(painter.blocks.len(), 1);
+}
+
 
 #[cfg(test)]
 #[test]
@@ -218,6 +269,7 @@ fn test_isolate_rect() {
                         continue;
                     }
                     check_isolate_rect(Shape { x1, y1, x2, y2 });
+                    check_isolate_rect_2(Shape { x1, y1, x2, y2 });
                 }
             }
         }

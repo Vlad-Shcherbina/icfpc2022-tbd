@@ -639,7 +639,9 @@ impl PainterState {
 }
 
 pub fn merge_shapes(shape1: Shape, shape2: Shape) -> Option<Shape> {
-    if shape1.x2 == shape2.x1 && shape1.y1 == shape2.y1 && shape1.y2 == shape2.y2 {
+    if shape1.intersect(&shape2).is_some() {
+        None
+    } else if shape1.x2 == shape2.x1 && shape1.y1 == shape2.y1 && shape1.y2 == shape2.y2 {
         // 1 to the left of 2
         Some(Shape {
             x1: shape1.x1,
