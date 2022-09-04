@@ -1,21 +1,16 @@
 #![allow(dead_code)]
+#![allow(unused_imports)]
 #![allow(clippy::needless_range_loop)]
 
 use fxhash::FxHashMap as HashMap;
 use rand::prelude::*;
 use rstats::{VecVec};
+use rand::prelude::*;
 
-use crate::{basic::{Color, Shape }, image::Image, util::project_path};
+use crate::basic::*;
+use crate::image::Image;
 
-fn color_to_f64(c: &Color) -> [f64; 4] {
-    [c.0[0] as f64, c.0[1] as f64, c.0[2] as f64, c.0[3] as f64]
-}
-
-fn f64_to_color(c: &[f64; 4]) -> Color {
-    Color([c[0].round() as u8, c[1].round() as u8, c[2].round() as u8, c[3].round() as u8])
-}
-
-fn shape_distance(colors: &HashMap<Color, f64>, color: &Color) -> f64 {
+fn color_freqs_distance(colors: &HashMap<Color, f64>, color: Color) -> f64 {
     let mut d = 0f64;
     for (k, v) in colors {
         d += color.dist(k) * v;
@@ -23,30 +18,7 @@ fn shape_distance(colors: &HashMap<Color, f64>, color: &Color) -> f64 {
     d
 }
 
-fn gradient_step(colors: &HashMap<Color, f64>, color: &mut [f64; 4], step_size: f64) {
-    let mut gradient = [0f64; 4];
-    for (k, v) in colors {
-        let mut step = [0f64; 4];
-        let mut len = 0f64;
-        for i in 0..4 {
-            step[i] = k.0[i] as f64 - color[i] as f64;
-            len += step[i] * step[i];
-        }
-        if len > 1.0 {
-            let coeff = 1.0 / len.sqrt() * v;
-            for i in 0..4 {
-                gradient[i] += step[i] * coeff;
-            }
-        }
-    }
-    let mut len = 0f64;
-    for i in 0..4 { len += gradient[i] * gradient[i]; }
-    if len > 1.0 {
-        for i in 0..4 { color[i] += gradient[i] / len.sqrt() * step_size; }
-    }
-}
-
-pub fn dist_to_color_freqs(color_freqs: &HashMap<Color, f64>, color: &Color) -> f64 {
+pub fn dist_to_color_freqs(color_freqs: &HashMap<Color, f64>, color: Color) -> f64 {
     let mut res = 0f64;
     for (k, v) in color_freqs {
         res += color.dist(k) * v;
@@ -64,27 +36,147 @@ pub fn color_freqs(pic: &Image, shape: &Shape) -> HashMap<Color, f64> {
     colors
 }
 
-const K_STEP_NUM: i32 = 500;
-const K_STEP: f64 = 0.8;
+// The multivariate L1-median and associated data depth
+// Yehuda Vardi and Cun-Hui Zhang
+// https://www.ncbi.nlm.nih.gov/pmc/articles/PMC26449/pdf/pq001423.pdf
+fn modified_weiszfeld(color_freqs: &HashMap<Color, f64>, iterations: i32) -> Color {
+    let _t = crate::stats_timer!("modified_weiszfeld").time_it();
+    if color_freqs.len() <= 2 {
+        // Because their algorithm doesn't work if all colors are collinear.
+        let mut best_freq = -1.0;
+        let mut best_color = Color([0; 4]);
+        for (&color, &freq) in color_freqs {
+            if freq > best_freq {
+                best_freq = freq;
+                best_color = color;
+            }
+        }
+        return best_color;
+    }
+
+    let color_freqs_vec: Vec<(Color, f64)> = color_freqs.iter().map(|(k, v)| (*k, *v)).collect();
+    let mut weights = vec![0f64; color_freqs_vec.len()];
+    let mut y = [128.0f64; 4];
+    for _ in 0..iterations {
+        crate::stats_counter!("modified_weiszfeld/iteration").inc();
+        let mut collision = None;
+        for (i, &(c, freq)) in color_freqs_vec.iter().enumerate() {
+            let mut d = 0f64;
+            for j in 0..4 {
+                let t = c.0[j] as f64 - y[j];
+                d += t * t;
+            }
+            if d < 1e-30  {
+                assert!(collision.is_none());
+                collision = Some(i);
+                weights[i] = 0.0;
+            } else {
+                weights[i] = freq / d.sqrt();
+                assert!(weights[i].is_finite(), "{:?} {:?}", freq, d);
+            }
+        }
+        let sum = weights.iter().sum::<f64>();
+        let inv_sum = 1.0 / sum;
+        assert!(inv_sum.is_finite());
+        for w in &mut weights { *w *= inv_sum; }
+        y = [0f64; 4];
+        for (i, &(c, _)) in color_freqs_vec.iter().enumerate() {
+            for j in 0..4 {
+                y[j] += c.0[j] as f64 * weights[i];
+            }
+        }
+
+        if let Some(collision) = collision {
+            let mut rs = [0f64; 4];
+            for (i, &(c, freq)) in color_freqs_vec.iter().enumerate() {
+                if i == collision { continue; }
+                let mut d = 0f64;
+                for j in 0..4 {
+                    let t = c.0[j] as f64 - y[j];
+                    d += t * t;
+                }
+                assert!(d > 1e-30);
+                let dd = 1.0 / d.sqrt();
+                assert!(d.is_finite());
+                for j in 0..4 {
+                    rs[j] += freq * (c.0[j] as f64 - y[j]) * dd;
+                }
+            }
+            let mut r = 0f64;
+            for j in 0..4 {
+                r += rs[j] * rs[j];
+            }
+            let r = r.sqrt();
+            assert!(r > 1e-30);
+            let freq = color_freqs_vec[collision].1;
+            let alpha = (freq / r).min(1.0);
+            assert!(alpha.is_finite());
+
+            let c = color_freqs_vec[collision].0;
+            for j in 0..4 {
+                y[j] = (1.0 - alpha) * y[j] + alpha * c.0[j] as f64;
+            }
+        }
+
+        for i in 0..4 {
+            assert!(y[i].is_finite(), "{:?} {:?}", y, weights);
+        }
+        // dbg!(f64_to_color(&y));
+    }
+    // dbg!(y);
+
+    let mut best_dist = 1e20;
+    let mut best_color = Color::default();
+    // try to round each component both up and down
+    for mask in 0..16 {
+        let c = Color([
+            (y[0] as u8).wrapping_add(mask & 1),
+            (y[1] as u8).wrapping_add((mask >> 1) & 1),
+            (y[2] as u8).wrapping_add((mask >> 2) & 1),
+            (y[3] as u8).wrapping_add(mask >> 3),
+        ]);
+        let dist = color_freqs_distance(color_freqs, c);
+        if dist < best_dist {
+            best_dist = dist;
+            best_color = c;
+        }
+    }
+    best_color
+}
+
+fn climb(color_freqs: &HashMap<Color, f64>, mut color: Color) -> Color {
+    let _t = crate::stats_timer!("climb").time_it();
+    loop {
+        crate::stats_counter!("climb/iteration").inc();
+        let mut d = color_freqs_distance(color_freqs, color);
+        let mut changed = false;
+        for i in 0..4 {
+            for delta in [-1, 1] {
+                let mut c2 = color;
+                c2.0[i] = (c2.0[i] as i32 + delta) as u8;
+                let d2 = color_freqs_distance(color_freqs, c2);
+                if d2 < d {
+                    color = c2;
+                    d = d2;
+                    changed = true;
+                }
+            }
+        }
+        if !changed {
+            return color;
+        }
+    }
+}
 
 fn optimal_color_for_color_freqs(color_freqs: &HashMap<Color, f64>) -> Color {
-    let _t = crate::stats_timer!("optimal_color_for_color_freqs").time_it();
-    let color = Color([128; 4]);
-    let mut color_array = color_to_f64(&color);
-    let mut step_size: f64 = 100.0;
-    let mut last_color = color_array;
-    let mut last_dist = dist_to_color_freqs(color_freqs, &f64_to_color(&last_color));
-    for _ in 0..K_STEP_NUM {
-        gradient_step(color_freqs, &mut color_array, step_size);
-        let new_dist = dist_to_color_freqs(color_freqs, &f64_to_color(&color_array));
-        if step_size == 1.0 && new_dist.abs() > last_dist.abs() { break; }
-        last_dist = new_dist;
-        last_color = color_array;
+    let color = modified_weiszfeld(color_freqs, 10);
+    climb(color_freqs, color)
+}
 
-        step_size *= K_STEP;
-        if step_size < 1.0 { step_size = 1.0; }
-    }
-    f64_to_color(&last_color)
+fn check_optimal_color_for_color_freqs(color_freqs: &HashMap<Color, f64>, color: Color) {
+    let c2 = climb(color_freqs, color);
+    assert_eq!(c2, color);
+    // assert!(c2.dist(&color) < 10.0, "{} {}", c2, color);
 }
 
 // Gradient descent based. See also gmedian_color().
@@ -95,7 +187,7 @@ pub fn optimal_color_for_block(pic: &Image, shape: &Shape) -> Color {
 
 pub fn best_from_palette(color_freqs: &HashMap<Color, f64>, palette: &[Color]) -> usize {
     (0..palette.len()).min_by_key(
-        |&i| (1000.0 * dist_to_color_freqs(color_freqs, &palette[i])).round() as i64,
+        |&i| (1000.0 * dist_to_color_freqs(color_freqs, palette[i])).round() as i64,
     ).unwrap()
 }
 
@@ -135,33 +227,53 @@ pub fn k_means(color_freqss: &[HashMap<Color, f64>], num_clusters: usize) -> Vec
     centers
 }
 
+#[test]
+fn test_modified_weiszfeld() {
+    let mut rng = rand::rngs::StdRng::seed_from_u64(42);
+    for _ in 0..1000 {
+        let mut color_freqs: HashMap<Color, f64> = HashMap::default();
+        for _ in 0..rng.gen_range(1..10) {
+            let c = Color([
+                rng.gen(),
+                rng.gen(),
+                rng.gen(),
+                rng.gen(),
+            ]);
+            let freq = rng.gen_range(1..1000) as f64;
+            *color_freqs.entry(c).or_default() += freq;
+        }
+        dbg!(&color_freqs);
+        let color = optimal_color_for_color_freqs(&color_freqs);
+        check_optimal_color_for_color_freqs(&color_freqs, color);
+    }
+}
+
 crate::entry_point!("gradient", gradient);
 fn gradient() {
-    let args: Vec<String> = std::env::args().skip(2).collect();
-    if args.len() != 1 {
-        println!("Usage: cargo run --release gradient <problem id>");
-        std::process::exit(1);
-    }
-    let problem_id: i32 = args[0].parse().unwrap();
+    /*let mut color_freqs = HashMap::default();
+    color_freqs.insert(Color([73, 12, 25, 19]), 30.0);
+    color_freqs.insert(Color([201, 25, 148, 55]), 846.0);
+    color_freqs.insert(Color([227, 119, 86, 143]), 146.0);
 
-    let target = Image::load(&project_path(format!("data/problems/{}.png", problem_id)));
-
-    let mut colors: HashMap<Color, f64> = HashMap::default();
-    for x in 0..target.width {
-        for y in 0..target.height {
-            *colors.entry(target.get_pixel(x, y)).or_default() += 1.0;
-        }
-    }
-    let shape = Shape{x1: 0, x2: target.width, y1: 0, y2: target.height};
+    let color = modified_weiszfeld(&color_freqs, 20);
+    dbg!(color);
+    check_optimal_color_for_color_freqs(&color_freqs, color);*/
 
     let start = std::time::Instant::now();
-    let colors = color_freqs(&target, &shape);
-    dbg!(start.elapsed());
+    for problem_id in 1..=35 {
+        // dbg!(problem_id);
+        eprintln!("--------- {} ---------", problem_id);
+        let problem = Problem::load(problem_id);
 
-    let start = std::time::Instant::now();
-    let res = optimal_color_for_color_freqs(&colors);
-    dbg!(start.elapsed());
-    println!("{}", shape_distance(&colors, &res));
+        let color_freqs = color_freqs(&problem.target, &Shape::from_image(&problem.target));
+        // let color = optimal_color_for_color_freqs(&color_freqs);
+        // eprintln!("{} {}", color, dist_to_color_freqs(&color_freqs, color));
+        let color = optimal_color_for_color_freqs(&color_freqs);
+        // dbg!(color);
+        check_optimal_color_for_color_freqs(&color_freqs, color);
+    }
+    eprintln!("it took {:?}", start.elapsed());
+    eprintln!("{}", crate::stats::STATS.render());
 }
 
 pub fn mean_color(img: &Image, shape: Shape) -> Color {
