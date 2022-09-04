@@ -469,22 +469,6 @@ pub struct ApplyMoveResult {
 }
 
 impl PainterState {
-    /*pub fn new(width: i32, height: i32) -> Self {
-        let mut blocks = HashMap::new();
-        let shape = Shape { x1: 0, y1: 0, x2: width, y2: height };
-        blocks.insert(BlockId::root(0), Block {
-            shape,
-            pieces: vec![(shape, Color([255, 255, 255, 255]))],
-        });
-        PainterState {
-            width,
-            height,
-            next_id: 1,
-            blocks,
-            cost: 0,
-            history: vec![],
-        }
-    }*/
     pub fn new(p: &Problem) -> Self {
         for (id, _b) in &p.start_blocks {
             assert_eq!(id.0.len(), 1);
