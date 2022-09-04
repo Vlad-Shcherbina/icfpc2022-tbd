@@ -28,3 +28,23 @@ pub fn project_path(rel: impl AsRef<Path>) -> PathBuf {
 fn project_path_test() {
     assert!(project_path("src/util.rs").exists());
 }
+
+pub fn parse_range(s: &str) -> std::ops::RangeInclusive<i32> {
+    match s.split_once("..") {
+        Some((left, right)) => {
+            let left: i32 = left.parse().unwrap();
+            let right: i32 = right.parse().unwrap();
+            left..=right
+        }
+        None => {
+            let x: i32 = s.parse().unwrap();
+            x..=x
+        }
+    }
+}
+
+#[test]
+fn test_parse_range() {
+    assert_eq!(parse_range("1"), 1..=1);
+    assert_eq!(parse_range("1..42"), 1..=42);
+}

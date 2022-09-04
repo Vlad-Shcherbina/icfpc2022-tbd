@@ -5,3 +5,4 @@ mod swan;
 mod poke;
 mod ga;
 mod spot;
+mod brick;
