@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use crate::basic::*;
 use crate::image::Image;
 
+#[derive(Clone, Copy)]
 pub enum Transformation {
     TransposeXY,
     FlipY(i32)
@@ -201,6 +202,51 @@ fn assert_solutions_equal(moves1: &Vec<Move>, moves2: &Vec<Move>) {
 //        println!("{}", m);
 //    }
 //}
+
+pub fn inverse_transform_sequence(sequence: &Vec<Transformation>) -> Vec<Transformation> {
+    let mut res = vec![];
+    for t in sequence {
+        match t {
+            Transformation::TransposeXY => res.push(Transformation::TransposeXY),
+            Transformation::FlipY(h) => res.push(Transformation::FlipY(*h)),
+        }
+    }
+    res.reverse();
+    res
+}
+
+pub fn every_transform_sequence(h: i32) -> Vec<Vec<Transformation>> {
+    let t = Transformation::TransposeXY;
+    let f = Transformation::FlipY(h);
+    vec![
+        vec![],
+        vec![t],
+        vec![f],
+        vec![t, f],
+        vec![f, t],
+        vec![f, t, f],
+        vec![t, f, t],
+        vec![f, t, f, t]
+        ]
+}
+
+impl Problem {
+    pub fn apply_transform_sequence(&self, sequence: &Vec<Transformation>) -> Problem {
+        let mut res = self.clone();
+        for t in sequence {
+            res = res.transform(t);
+        }
+        res
+    }
+}
+
+// Usage:
+// for seq in every_transform_sequence(problem.height()) {
+//     let transformed_problem = problem.apply_transform_sequence(&seq);
+//     transformed_moves = solve(problem);
+//     ...
+//  }
+// best_moves = apply_transform_sequence(best_transformed_moves, inverse_transform_sequence(best_seq);
 
 #[test]
 fn test_transform_solution() {

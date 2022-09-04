@@ -883,13 +883,13 @@ impl Problem {
         Shape { x1: 0, y1: 0, x2: self.width, y2: self.height }
     }
 
-    pub fn transform(p: &Problem, t: &Transformation) -> Problem {
-        let new_target = p.target.transform(t);
+    pub fn transform(&self, t: &Transformation) -> Problem {
+        let new_target = self.target.transform(t);
         let new_width = new_target.width;
         let new_height = new_target.height;
-        let new_initial_img = p.initial_img.as_ref().map(|img| img.transform(t));
+        let new_initial_img = self.initial_img.as_ref().map(|img| img.transform(t));
         let mut new_start_blocks = vec![];
-        for (block_id, block) in &p.start_blocks {
+        for (block_id, block) in &self.start_blocks {
             new_start_blocks.push((block_id.clone(), block.transform(t)));
         }
         Problem {
@@ -898,7 +898,7 @@ impl Problem {
             target: new_target,
             initial_img: new_initial_img,
             start_blocks: new_start_blocks,
-            base_costs: p.base_costs.clone(),
+            base_costs: self.base_costs.clone(),
         }
     }
 }
