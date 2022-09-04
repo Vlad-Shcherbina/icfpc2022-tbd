@@ -9,14 +9,11 @@
 #include "islseq.h"
 #include "memory.h"
 #include "string.h"
-#include "xogui.h"
 
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <x86intrin.h>
-
-XoGUI *gui = NULL;
 
 typedef struct {
    BitMap *target; /* stays untouched */
@@ -100,12 +97,6 @@ void BloCoder_Reset(BloCoder *blo) {
 
 /* ------------------------------------------------------------------------ */
 
-void BloCoder_Update(BloCoder *blocoder) {
-   XoGUI_Update(gui, 0.1);
-}
-
-/* ------------------------------------------------------------------------ */
-
 //void BloCoder_MergeAll
 
 /* ------------------------------------------------------------------------ */
@@ -121,7 +112,6 @@ void BloCoder_PrintValidBlocks(const BloCoder *blo) {
 
 void BloCoder_Destroy(BloCoder *blocoder) {
     DArray_Destroy(blocoder->blockdata, (DestFunc *)BlockData_Destroy);
-    if (gui != NULL) XoGUI_Destroy(gui);
     BitMap_Destroy(blocoder->target);
     BitMap_Destroy(blocoder->canvas);
     Memory_Free(blocoder, BloCoder);
@@ -550,7 +540,7 @@ int toplevel;
 
 void update_bestsofar(int score, int *bestsofar, ISL *bestisl, int *bestislc, ISL *src, int nsrc, int a) {
     if (score < *bestsofar) {
-        printf("Problem %2i : [ t =%5.1fs ] new approximation %i (imrpoves old %i) [depth=%i]\n", global_prob_id, Std_Time() - start_time, score, *bestsofar, a);
+        printf("Problem %2i : [ t =%5.1fs ] new approximation %i (improves old %i) [depth=%i]\n", global_prob_id, Std_Time() - start_time, score, *bestsofar, a);
         *bestsofar = score;
         Memory_Copy(bestisl, src, nsrc*sizeof(ISL));
         *bestislc = nsrc;
@@ -747,8 +737,8 @@ void BloCoder_ISLPostProcess(const char *filename, ISLSeq *sseq) {
                 orgcol.dword = isl->color.col.dword;
                 for (int c=0; c<4; c++) {
 nextdec:
-                    if (isl->color.col.v[c] > 0) {
-                        isl->color.col.v[c]--;
+                    if (isl->color.col.v[c] > 1) {
+                        isl->color.col.v[c]-=2;
                         score = BloCoder_ScoreSeq(blo, sseq);
                         if (score < bestscore) {
                             ISLSeq_Destroy(bestseq);
@@ -761,8 +751,8 @@ nextdec:
                             isl->color.col.dword = orgcol.dword;
                     }
 nextinc:
-                    if (isl->color.col.v[c] < 255) {
-                        isl->color.col.v[c]--;
+                    if (isl->color.col.v[c] < 254) {
+                        isl->color.col.v[c]-=2;
                         score = BloCoder_ScoreSeq(blo, sseq);
                         if (score < bestscore) {
                             ISLSeq_Destroy(bestseq);

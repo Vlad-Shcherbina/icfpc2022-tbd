@@ -5,7 +5,7 @@ DEBUG=1
 OBJECT_FILES=	\
 	blocoder.o 
 
-LIBS= -L/usr/X11R6/lib/ -lm -lX11 -lXext -lpng -lz
+LIBS= -lm -lpng -lz
 
 ifdef DEBUG
 
@@ -27,10 +27,7 @@ OBJECT_FILES +=	\
 	pixelcolor.o \
 	serialized.o \
 	stdfunc.o \
-	string.o \
-	xodget.o \
-	xogui.o \
-	xowin.o
+	string.o
 
 LIBS+=
 CFLAGS= -O0 -g -march=native -Wall
