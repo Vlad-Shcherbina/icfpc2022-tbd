@@ -9,5 +9,8 @@ for x in {1..1000}; do
     if [[ $x -gt 25 ]] ; then
         wget "https://cdn.robovinci.xyz/imageframes/$x.initial.json" -O "data/problems/$x.initial.json"
         wget "https://cdn.robovinci.xyz/imageframes/$x.initial.png" -O "data/problems/$x.initial.png"
+        if [[ $x -gt 35 ]] ; then
+            wget "https://cdn.robovinci.xyz/imageframes/$x.source.png" -O "data/problems/$x.source.png"
+        fi
     fi
 done
