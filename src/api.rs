@@ -127,7 +127,7 @@ pub struct SubmissionStatus {
     pub file_url: String,
 }
 
-crate::entry_point!("api_demo", api_demo);
+crate::entry_point!("api_demo", api_demo, _EP1);
 fn api_demo() {
     let mut client = crate::db::create_client();
 
@@ -143,4 +143,13 @@ fn api_demo() {
             let timestamp: DateTime = row.get("timestamp");
             println!("* * *\n({:?}) : {:?} @ {:?}", submission_id, cost, timestamp);
         });
+}
+
+crate::entry_point!("submit_all_best_solutions", submit_all_best_solutions, _EP2);
+fn submit_all_best_solutions() {
+    let mut client = crate::db::create_client();
+    for problem_id in 1..=40 {
+        submit_best_solution(&mut client, problem_id);
+        eprintln!("submitted best solution for problem {}", problem_id);
+    }
 }
