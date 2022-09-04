@@ -159,11 +159,11 @@ fn plan_merge_all(canvas_size: i32, shapes: &[Shape]) -> Vec<(usize, usize)> {
     state.best_plan.unwrap()
 }
 
-pub fn merge_all(p: &mut PainterState) -> (BlockId, Vec<Move>) {
+pub fn merge_all_inside_bb(p: &mut PainterState, bb: Shape) -> (BlockId, Vec<Move>) {
     let _t = crate::stats_timer!("merge_all").time_it();
     let mut shapes: Vec<Shape> = vec![];
     let mut ids: Vec<BlockId> = vec![];
-    let mut id_blocks: Vec<_> = p.blocks.iter().collect();
+    let mut id_blocks: Vec<_> = p.blocks.iter().filter(|(_, b)| bb.contains(b.shape)).collect();
     id_blocks.sort_by_key(|&(_, b)| b.shape);
     for (id, block) in id_blocks {
         shapes.push(block.shape);
@@ -182,9 +182,15 @@ pub fn merge_all(p: &mut PainterState) -> (BlockId, Vec<Move>) {
     }
 
     let root_id = ids.pop().unwrap();
-    assert_eq!(p.blocks.len(), 1);
     assert!(p.blocks.contains_key(&root_id));
     (root_id, moves)
+}
+
+pub fn merge_all(p: &mut PainterState) -> (BlockId, Vec<Move>) {
+    // TODO: don't hardcode canvas size
+    let res = merge_all_inside_bb(p, Shape { x1: 0, y1: 0, x2: 400, y2: 400 });
+    assert_eq!(p.blocks.len(), 1);
+    res
 }
 
 
