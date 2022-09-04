@@ -214,7 +214,8 @@ impl<'a> Framework<'a> {
         let mut population = vec![Actions(vec![])];
         for gen in 0.. {
             population = self.run_one_generation(population);
-            let (res, moves) = self.state.eval(&population[0]);
+            let best_actions = &population[0];
+            let (res, moves) = self.state.eval_custom_merge(best_actions, &MergeAllPrecise{});
             println!("GEN {} SCORE {}", gen, res);
             if res < best {
                 println!("NEW BEST!");
@@ -248,6 +249,26 @@ struct State<'a> {
     last_used_color: Color,
 }
 
+trait MergeAll {
+    fn merge_all(&self, p: &mut PainterState) -> (BlockId, Vec<Move>);
+}
+
+struct MergeAllPrecise {}
+
+impl MergeAll for MergeAllPrecise {
+    fn merge_all(&self, p: &mut PainterState) -> (BlockId, Vec<Move>) {
+        seg_util::merge_all(p)
+    }
+}
+
+struct MergeAllFast {}
+
+impl MergeAll for MergeAllFast {
+    fn merge_all(&self, p: &mut PainterState) -> (BlockId, Vec<Move>) {
+        seg_util::merge_all_2(p)
+    }
+}
+
 impl<'a> State<'a> {
     fn new(problem: &'a Problem) -> State<'a> {
         let mut painter = PainterState::new(problem);
@@ -271,11 +292,13 @@ impl<'a> State<'a> {
     }
 
     fn eval(&mut self, actions: &Actions) -> (i64, Vec<Move>) {
-        // self.last_used_color = Color::default();
+        self.eval_custom_merge(actions, &MergeAllFast{})
+    }
+
+    fn eval_custom_merge<M: MergeAll>(&mut self, actions: &Actions, merge: &M) -> (i64, Vec<Move>) {
         self.painter.snapshot();
-        self.apply(actions);
+        self.apply(actions, merge);
         let moves = &self.painter.moves;
-        // println!("LOOL {:?}", moves);
         let moves = color_util::adjust_colors(self.problem, moves);
         let (painter_cost, painter_image) = self.reeval(&moves);
         self.painter.rollback();
@@ -292,7 +315,7 @@ impl<'a> State<'a> {
         }
     }
 
-    fn apply(&mut self, actions: &Actions) {
+    fn apply<M: MergeAll>(&mut self, actions: &Actions, merge: &M) {
         let mut root_id = self.root_id.clone();
         for action in &actions.0 {
             match action {
@@ -300,7 +323,7 @@ impl<'a> State<'a> {
                     let (block_id, _) = seg_util::isolate_rect(&mut self.painter, root_id, *shape);
                     let color = self.gen_unique_color();
                     self.painter.apply_move(&Move::ColorMove { block_id, color });
-                    let (new_root, _) = seg_util::merge_all_2(&mut self.painter);
+                    let (new_root, _) = merge.merge_all(&mut self.painter);
                     root_id = new_root;
                 }
                 Action::Swap { shape1, shape2 } => {
@@ -345,7 +368,7 @@ impl<'a> State<'a> {
                     let (block_id1, _) = seg_util::isolate_rect(&mut self.painter, res.new_block_ids[0].clone(), *s1);
                     let (block_id2, _) = seg_util::isolate_rect(&mut self.painter, res.new_block_ids[1].clone(), *s2);
                     self.painter.apply_move(&Move::Swap { block_id1, block_id2 });
-                    root_id = seg_util::merge_all_2(&mut self.painter).0;
+                    root_id = merge.merge_all(&mut self.painter).0;
                 }
             }
         }
@@ -386,7 +409,7 @@ fn ga_solver() {
         let dist = image_distance(&img, &problem.target);
         eprintln!("distance to target: {}", dist);
         let score = dist.round() as i64 + painter.cost;
-        eprintln!("final score: {}", score);
+        eprintln!("final score: {} (target {})", score, best);
 
         let output_path = format!("outputs/ga_{}.png", problem_id);
         img.save(&crate::util::project_path(&output_path));
