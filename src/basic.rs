@@ -18,6 +18,10 @@ impl Color {
         }
         (d as f64).sqrt()
     }
+
+    pub fn next(&self) -> Color {
+        Color((u32::from_be_bytes(self.0) + 1).to_be_bytes())
+    }
 }
 
 impl std::fmt::Debug for Color {

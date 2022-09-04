@@ -1,11 +1,13 @@
 use std::cmp::{max, min};
+use std::collections::HashSet;
 use rand::distributions::Uniform;
 use crate::basic::*;
 // use crate::invocation::{record_this_invocation, Status};
-use crate::seg_util;
+use crate::{color_util, seg_util};
 // use crate::uploader::upload_solution;
 use rand::prelude::*;
 use rand::rngs::ThreadRng;
+use crate::image::Image;
 
 crate::entry_point!("ga_solver", ga_solver);
 
@@ -95,32 +97,8 @@ impl Distribution<(Shape, Shape)> for UniformTwoNonIntersectingSubshapes {
     }
 }
 
-struct UniformColor {
-    uniform_component: Uniform<u8>,
-}
-
-impl UniformColor {
-    fn new() -> UniformColor {
-        UniformColor {
-            uniform_component: Uniform::new_inclusive(0, 255),
-        }
-    }
-}
-
-impl Distribution<Color> for UniformColor {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Color {
-        Color ([
-            self.uniform_component.sample(rng),
-            self.uniform_component.sample(rng),
-            self.uniform_component.sample(rng),
-            self.uniform_component.sample(rng),
-        ])
-    }
-}
-
 struct UniformAction {
     uniform_shape: UniformSubshape,
-    uniform_color: UniformColor,
     uniform_two_shapes: UniformTwoNonIntersectingSubshapes,
 }
 
@@ -128,7 +106,6 @@ impl UniformAction {
     fn new(shape: Shape) -> UniformAction {
         UniformAction {
             uniform_shape: UniformSubshape::new(shape),
-            uniform_color: UniformColor::new(),
             uniform_two_shapes: UniformTwoNonIntersectingSubshapes::new(shape),
         }
     }
@@ -139,7 +116,6 @@ impl Distribution<Action> for UniformAction {
         if rng.gen_bool(0.5) {
             Action::Color {
                 shape: self.uniform_shape.sample(rng),
-                color: self.uniform_color.sample(rng),
             }
         } else {
             let (shape1, shape2) = self.uniform_two_shapes.sample(rng);
@@ -250,53 +226,79 @@ impl<'a> Framework<'a> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum Action {
     Color {
-        shape: Shape, color: Color,
+        shape: Shape,
     },
     Swap {
         shape1: Shape, shape2: Shape,
     },
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Actions (pub Vec<Action>);
 
 struct State<'a> {
     problem: &'a Problem,
     root_id: BlockId,
     painter: PainterState<'a>,
+    initial_colors: HashSet<Color>,
+    last_used_color: Color,
 }
 
 impl<'a> State<'a> {
     fn new(problem: &'a Problem) -> State<'a> {
         let mut painter = PainterState::new(problem);
         let (root_id, _) = seg_util::merge_all_2(&mut painter);
+        let initial_colors = HashSet::new();
         State {
             problem,
             root_id,
             painter,
+            initial_colors,
+            last_used_color: Color::default(),
         }
     }
 
+    fn reeval(&self, moves: &Vec<Move>) -> (i64, Image) {
+        let mut painter = PainterState::new(self.problem);
+        for mv in moves {
+            painter.apply_move(mv);
+        }
+        (painter.cost, painter.render())
+    }
+
     fn eval(&mut self, actions: &Actions) -> (i64, Vec<Move>) {
+        // self.last_used_color = Color::default();
         self.painter.snapshot();
         self.apply(actions);
-        let img = self.painter.render();
-        let moves = self.painter.moves.clone();
-        let painter_cost = self.painter.cost;
+        let moves = &self.painter.moves;
+        // println!("LOOL {:?}", moves);
+        let moves = color_util::adjust_colors(self.problem, moves);
+        let (painter_cost, painter_image) = self.reeval(&moves);
         self.painter.rollback();
-        (painter_cost + image_distance(&img, &self.problem.target) as i64, moves)
+        (painter_cost + image_distance(&painter_image, &self.problem.target) as i64, moves)
+    }
+
+    fn gen_unique_color(&mut self) -> Color {
+        loop {
+            self.last_used_color = self.last_used_color.next();
+            if self.initial_colors.contains(&self.last_used_color) {
+                continue
+            }
+            return self.last_used_color
+        }
     }
 
     fn apply(&mut self, actions: &Actions) {
         let mut root_id = self.root_id.clone();
         for action in &actions.0 {
             match action {
-                Action::Color { shape, color } => {
+                Action::Color { shape } => {
                     let (block_id, _) = seg_util::isolate_rect(&mut self.painter, root_id, *shape);
-                    self.painter.apply_move(&Move::ColorMove { block_id, color: *color });
+                    let color = self.gen_unique_color();
+                    self.painter.apply_move(&Move::ColorMove { block_id, color });
                     let (new_root, _) = seg_util::merge_all_2(&mut self.painter);
                     root_id = new_root;
                 }
@@ -386,6 +388,7 @@ fn ga_solver() {
     };
 
     let mut framework = Framework::new(&problem, 10, 10);
+
     framework.run(new_best_callback);
 
     // let mut client = crate::db::create_client();

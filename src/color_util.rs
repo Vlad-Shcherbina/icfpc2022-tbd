@@ -2,7 +2,7 @@
 #![allow(unused_imports)]
 #![allow(clippy::needless_range_loop)]
 
-use fxhash::FxHashMap as HashMap;
+use std::collections::{HashMap, HashSet};
 use rand::prelude::*;
 use rand::prelude::*;
 
@@ -293,4 +293,38 @@ pub fn mean_color(img: &Image, shape: Shape) -> Color {
         (b / pixels) as u8,
         (a / pixels) as u8,
     ])
+}
+
+pub fn adjust_colors(problem: &Problem, moves: &Vec<Move>) -> Vec<Move> {
+    let mut painter = PainterState::new(problem);
+    let mut color_moves = HashSet::new();
+    for mv in moves {
+        painter.apply_move(mv);
+        if let Move::ColorMove { block_id: _, color } = mv {
+            color_moves.insert(color);
+        }
+    }
+    let mut freqs: HashMap<Color, HashMap<Color, f64>> = color_moves.into_iter().map(|color| {
+        (*color, HashMap::new())
+    }).collect();
+    let img = painter.render();
+    for x in 0..img.width {
+        for y in 0..img.height {
+            let color = img.get_pixel(x, y);
+            if let Some(freq) = freqs.get_mut(&color) {
+                *freq.entry(problem.target.get_pixel(x, y)).or_default() += 1.0;
+            }
+        }
+    }
+    let new_colors: HashMap<Color, Color> = freqs.into_iter().map(|(color, freq)| {
+        (color, optimal_color_for_color_freqs(&freq))
+    }).collect();
+    moves.iter().map(|mv| {
+        match mv {
+            Move::ColorMove { block_id, color } => {
+                Move::ColorMove {block_id: block_id.clone(), color: new_colors[color]}
+            }
+            _ => mv.clone()
+        }
+    }).collect()
 }
