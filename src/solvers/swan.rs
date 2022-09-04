@@ -42,8 +42,8 @@ fn swan_solver() {
 
     let mut argss = vec![];
     for num_colors in 2..=5 {
-        for px in [20, 25, 40, 50, 80, 100] {
-            for py in [20, 25, 40, 50, 80, 100] {
+        for px in [40, 50, 80, 100] {
+            for py in [40, 50, 80, 100] {
                 argss.push(SolverArgs { px, py, num_colors });
             }
         }
