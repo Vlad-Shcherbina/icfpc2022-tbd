@@ -4,10 +4,11 @@ use rand::distributions::Uniform;
 use crate::basic::*;
 // use crate::invocation::{record_this_invocation, Status};
 use crate::{color_util, seg_util};
-// use crate::uploader::upload_solution;
 use rand::prelude::*;
 use rand::rngs::ThreadRng;
 use crate::image::Image;
+use crate::invocation::{record_this_invocation, Status};
+use crate::uploader::{best_solution, upload_solution};
 
 crate::entry_point!("ga_solver", ga_solver);
 
@@ -208,7 +209,7 @@ impl<'a> Framework<'a> {
         }).take(self.pop_size).collect()
     }
 
-    fn run<F: Fn(Vec<Move>)>(&mut self, callback: F) -> (i64, Vec<Move>) {
+    fn run<F: FnMut(Vec<Move>)>(&mut self, mut callback: F) -> (i64, Vec<Move>) {
         let (mut best, mut best_moves) = self.state.eval(&Actions(vec![]));
         let mut population = vec![Actions(vec![])];
         for gen in 0.. {
@@ -250,7 +251,7 @@ struct State<'a> {
 impl<'a> State<'a> {
     fn new(problem: &'a Problem) -> State<'a> {
         let mut painter = PainterState::new(problem);
-        let (root_id, _) = seg_util::merge_all_2(&mut painter);
+        let (root_id, _) = seg_util::merge_all(&mut painter);
         let initial_colors = HashSet::new();
         State {
             problem,
@@ -360,6 +361,10 @@ fn ga_solver() {
     let problem_id: i32 = args[0].parse().unwrap();
     let problem = Problem::load(problem_id);
 
+    let mut client = crate::db::create_client();
+    let best = best_solution(&mut client, problem_id).score;
+    println!("BEST for {}: {}", problem_id, best);
+
     // let mut state = State::new(problem.clone());
     // let (cost, moves) = state.eval(&Actions(vec![
     //     Action::Color {
@@ -374,26 +379,31 @@ fn ga_solver() {
 
     let new_best_callback = |moves: Vec<Move>| {
         let mut painter = PainterState::new(&problem);
-        moves.into_iter().for_each(|mv| {painter.apply_move(&mv);});
+        moves.iter().for_each(|mv| {painter.apply_move(mv);});
         let img = painter.render();
         eprintln!();
         eprintln!("cost: {}", painter.cost);
         let dist = image_distance(&img, &problem.target);
         eprintln!("distance to target: {}", dist);
-        eprintln!("final score: {}", dist.round() as i64 + painter.cost);
+        let score = dist.round() as i64 + painter.cost;
+        eprintln!("final score: {}", score);
 
         let output_path = format!("outputs/ga_{}.png", problem_id);
         img.save(&crate::util::project_path(&output_path));
         eprintln!("saved to {}", output_path);
+
+        if score < best {
+            println!("YAY I WON: {} < {}", score, best);
+            let mut tx = client.transaction().unwrap();
+            let incovation_id = record_this_invocation(&mut tx, Status::Stopped);
+            upload_solution(&mut tx, problem_id, &moves, "ga", &serde_json::Value::Null, incovation_id);
+            tx.commit().unwrap();
+        }
+
     };
 
     let mut framework = Framework::new(&problem, 10, 10);
 
     framework.run(new_best_callback);
 
-    // let mut client = crate::db::create_client();
-    // let mut tx = client.transaction().unwrap();
-    // let incovation_id = record_this_invocation(&mut tx, Status::Stopped);
-    // upload_solution(&mut tx, problem_id, &moves, "dummy", &serde_json::Value::Null, incovation_id);
-    // tx.commit().unwrap();
 }
