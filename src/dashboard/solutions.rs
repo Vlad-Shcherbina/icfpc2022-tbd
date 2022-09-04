@@ -54,13 +54,32 @@ pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: Respo
             let timestamp: DateTime = row.get("timestamp");
 
             let solver_args = serde_json::to_string(&solver_args.0).unwrap();
-            let sr = SolutionRow { id, problem_id, /* data, */ moves_cost, image_distance, score, solver_name, solver_args, invocation_id, timestamp };
+            let sr = SolutionRow {
+                id,
+                problem_id,
+                /* data, */
+                moves_cost,
+                image_distance,
+                score,
+                solver_name,
+                solver_args,
+                invocation_id,
+                timestamp,
+                best: false,
+            };
             problem_id_to_rows.entry(problem_id).or_default().push(sr);
         }
         if !archive {
             for rows in problem_id_to_rows.values_mut() {
                 let best = rows.iter().min_by_key(|r| (r.score, r.timestamp)).unwrap();
                 *rows = vec![best.clone()];
+            }
+        } else {
+            for rows in problem_id_to_rows.values_mut() {
+                let score = rows.iter().map(|r| r.score).min().unwrap();
+                for row in rows {
+                    row.best = row.score == score;
+                }
             }
         }
 
@@ -176,7 +195,8 @@ struct SolutionRow {
     solver_name: String,
     solver_args: String,
     invocation_id: i32,
-    timestamp: DateTime
+    timestamp: DateTime,
+    best: bool,
 }
 
 struct SolutionsOpts {
@@ -188,6 +208,12 @@ struct SolutionsOpts {
 {% extends "base.html" %}
 {% block title %}sol/{% endblock %}
 {% block body %}
+
+<style>
+    tr.best {
+        font-weight: bold;
+    }
+</style>
 
 <a href="?">best</a> |
 <a href="?archive={{ !opts.archive }}">archive (all)</a>
@@ -209,7 +235,7 @@ struct SolutionsOpts {
 </tr>
 </thead>
 {% for row in rows %}
-    <tr>
+    <tr {% if row.best %} class="best" {% endif %}>
         <td>{{ row.timestamp.format("%d %H:%M:%S").to_string() }}</td>
         <!-- {{ row.id }} -->
         <td><a href="/solution/?problem_id={{ row.problem_id }}&archive=true">#{{ row.problem_id }}</a></td>
