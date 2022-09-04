@@ -34,6 +34,7 @@ fn brick_solver() {
         }
     }
     eprintln!("{:?}", best_scores);
+    let local_best_scores: BTreeMap<i32, Mutex<i64>> = problem_range.clone().map(|i| (i, Mutex::new(i64::MAX))).collect();
     let improvements: HashMap<i32, Vec<Move>> = HashMap::new();
 
     let client = Mutex::new(client);
@@ -60,10 +61,15 @@ fn brick_solver() {
                 }
                 tx.commit().unwrap();
                 eprintln!("{}", crate::stats::STATS.render());
+
+                for (problem_id, best_score) in &best_scores {
+                    eprintln!("problem {}:  our {},  best {}", problem_id, local_best_scores[problem_id].lock().unwrap(), best_score.lock().unwrap());
+                }
             }
         });
 
         for problem_id in problem_range {
+            let local_best_score = &local_best_scores[&problem_id];
             let best_score = &best_scores[&problem_id];
             let improvements = &improvements;
             scope.spawn(move || {
@@ -78,12 +84,17 @@ fn brick_solver() {
                     }
                     let (score, moves) = do_bricks(&problem, &initial_moves, ys, xss);
                     // eprintln!("{} {}", problem_id, score);
-                    let best_score = &mut *best_score.lock().unwrap();
-                    if score < *best_score {
-                        eprintln!("improvement for problem {}: {} -> {}", problem_id, *best_score, score);
-                        *best_score = score;
-                        let improvements = &mut *improvements.lock().unwrap();
-                        improvements.insert(problem_id, moves);
+                    let local_best_score = &mut *local_best_score.lock().unwrap();
+                    if score < *local_best_score {
+                        eprintln!("improvement for problem {}: {} -> {}", problem_id, *local_best_score, score);
+                        *local_best_score = score;
+                        let best_score = &mut *best_score.lock().unwrap();
+                        if score < *best_score {
+                            eprintln!("new best score for problem {}: {} -> {}", problem_id, *best_score, score);
+                            *best_score = score;
+                            let improvements = &mut *improvements.lock().unwrap();
+                            improvements.insert(problem_id, moves);
+                        }
                     }
                 }
             });
