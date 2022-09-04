@@ -1,6 +1,7 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
 
+use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::fmt::{Formatter, Write};
 use crate::image::Image;
@@ -286,7 +287,7 @@ impl Shape {
         self.width() * self.height()
     }
 
-    fn p_cut_subshapes(&self, x: i32, y: i32) -> [Shape; 4] {
+    pub fn p_cut_subshapes(&self, x: i32, y: i32) -> [Shape; 4] {
         assert!(self.x1 < x && x < self.x2);
         assert!(self.y1 < y && y < self.y2);
         [
@@ -317,7 +318,7 @@ impl Shape {
         ]
     }
 
-    fn l_cut_subshapes(&self, orientation: Orientation, line_number: i32) -> [Shape; 2] {
+    pub fn l_cut_subshapes(&self, orientation: Orientation, line_number: i32) -> [Shape; 2] {
         match orientation {
             Horizontal => {
                 assert!(self.y1 < line_number && line_number < self.y2);
@@ -358,6 +359,18 @@ impl Shape {
 
     pub fn contains(&self, other: Shape) -> bool {
         self.x1 <= other.x1 && other.x2 <= self.x2 && self.y1 <= other.y1 && other.y2 <= self.y2
+    }
+
+    pub fn intersect(&self, other: &Shape) -> Option<Shape> {
+        let x1 = max(self.x1, other.x1);
+        let y1 = max(self.y1, other.y1);
+        let x2 = min(self.x2, other.x2);
+        let y2 = min(self.y2, other.y2);
+        if x1 < x2 && y1 < y2 {
+            Some(Shape {x1, y1, x2, y2})
+        } else {
+            None
+        }
     }
 
     pub(crate) fn from_image(img: &Image) -> Shape {
@@ -437,6 +450,8 @@ pub struct PainterState {
     pub blocks: HashMap<BlockId, Block>,
     pub(crate) cost: i64,
     history: Vec<Vec<PainterStateAction>>,
+    snapshot: Option<usize>,  // target `history` size
+    pub moves: Vec<Move>,
 }
 
 pub struct ApplyMoveResult {
@@ -473,6 +488,8 @@ impl PainterState {
             blocks: p.start_blocks.iter().cloned().collect(),
             cost: 0,
             history: vec![],
+            snapshot: None,
+            moves: vec![],
         }
     }
 
@@ -505,6 +522,7 @@ impl PainterState {
                 }
             }
         };
+        self.moves.pop();
     }
 
     // Returns the cost of the applied move
@@ -584,6 +602,7 @@ impl PainterState {
         self.cost += extra_cost;
         actions.push(IncrementCost { added_cost: extra_cost });
         self.history.push(actions);
+        self.moves.push(m.clone());
         ApplyMoveResult {
             cost: extra_cost,
             new_block_ids,
@@ -602,6 +621,19 @@ impl PainterState {
             }
         }
         res
+    }
+
+    pub fn snapshot(&mut self) {
+        assert!(self.snapshot.is_none());
+        self.snapshot = Some(self.history.len());
+    }
+
+    pub fn rollback(&mut self) {
+        assert!(self.snapshot.is_some());
+        let target_size = self.snapshot.unwrap();
+        while self.history.len() != target_size {
+            self.rollback_move()
+        }
     }
 }
 
@@ -713,6 +745,7 @@ struct InitialBlock {
     color: [u8; 4],
 }
 
+#[derive(Clone)]
 pub struct Problem {
     pub width: i32,
     pub height: i32,
