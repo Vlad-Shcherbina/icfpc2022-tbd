@@ -1,3 +1,4 @@
+#![allow(clippy::infallible_destructuring_match)]
 
 use crate::basic::*;
 use crate::invocation::{record_this_invocation, Status};
@@ -29,7 +30,10 @@ impl State {
 
         let mut initial_palette = HashSet::<Color>::new();
         for block in painter_state.blocks.values() {
-            initial_palette.insert(block.pieces[0].1);
+            let color = match block.pieces[0].1 {
+                Pic::Unicolor(color) => color,
+            };
+            initial_palette.insert(color);
         }
         let mut color_distances = HashMap::<(Color, i32, i32), f64>::new();
         for &color in &initial_palette {
@@ -77,10 +81,14 @@ impl State {
 
             for (block_id1, block1) in &self.painter_state.blocks {
                 let (i1, j1) = self.block_idx(block1);
-                let color1 = block1.pieces[0].1;
+                let color1 = match block1.pieces[0].1 {
+                    Pic::Unicolor(color) => color,
+                };
                 for (block_id2, block2) in &self.painter_state.blocks {
                     let (i2, j2) = self.block_idx(block2);
-                    let color2 = block2.pieces[0].1;
+                    let color2 = match block2.pieces[0].1 {
+                        Pic::Unicolor(color) => color,
+                    };
                     let gain_from_swap = swap_cost as f64 +
                         self.color_distances[&(color1, i2, j2)] +
                         self.color_distances[&(color2, i1, j1)] -

@@ -384,9 +384,15 @@ impl Shape {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Pic {
+    Unicolor(Color),
+    // TODO: bitmap for problems 36-40
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Block {
     pub shape: Shape,
-    pub pieces: Vec<(Shape, Color)>,
+    pub pieces: Vec<(Shape, Pic)>,
 }
 
 impl Block {
@@ -401,6 +407,9 @@ impl Block {
                p.0.y2 <= shape.y1 || p.0.y1 >= shape.y2 {
                 continue;
             }
+            let sub_pic = match &p.1 {
+                Pic::Unicolor(c) => Pic::Unicolor(*c),
+            };
             pieces.push((
                 Shape {
                     x1: p.0.x1.max(shape.x1),
@@ -408,7 +417,7 @@ impl Block {
                     x2: p.0.x2.min(shape.x2),
                     y2: p.0.y2.min(shape.y2),
                 },
-                p.1,
+                sub_pic,
             ));
         }
         Block {
@@ -426,10 +435,10 @@ fn test_sub_block() {
     let c = Color([1, 2, 3, 4]);
     let block = Block {
         shape: shape,
-        pieces: vec![(shape.clone(), c)]
+        pieces: vec![(shape.clone(), Pic::Unicolor(c))],
     };
     let subblock = block.sub_block(shape2.clone());
-    assert!(subblock == Block {shape: shape2.clone(), pieces: vec![(shape2.clone(), c.clone())]})
+    assert!(subblock == Block {shape: shape2.clone(), pieces: vec![(shape2.clone(), Pic::Unicolor(c))]})
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -561,7 +570,7 @@ impl PainterState {
             Move::ColorMove { block_id, color } => {
                 let block = self.blocks.get_mut(block_id).unwrap();
                 actions.push(ColorBlock { block_id: block_id.clone(), old_block: block.clone() });
-                block.pieces = vec![(block.shape, *color)];
+                block.pieces = vec![(block.shape, Pic::Unicolor(*color))];
                 base_cost = 5;
                 block_size = block.shape.size();
             }
@@ -612,10 +621,13 @@ impl PainterState {
     pub fn render(&self) -> Image {
         let mut res = Image::new(self.width, self.height, Color::default());
         for block in self.blocks.values() {
-            for (shape, color) in &block.pieces {
+            for (shape, pic) in &block.pieces {
                 for x in shape.x1..shape.x2 {
                     for y in shape.y1..shape.y2 {
-                        res.set_pixel(x, y, *color);
+                        let color = match pic {
+                            Pic::Unicolor(c) => *c,
+                        };
+                        res.set_pixel(x, y, color);
                     }
                 }
             }
@@ -779,14 +791,14 @@ impl Problem {
                 };
                 start_blocks.push((block_id, Block {
                     shape,
-                    pieces: vec![(shape, color)],
+                    pieces: vec![(shape, Pic::Unicolor(color))],
                 }));
             }
         } else {
             let shape = Shape { x1: 0, y1: 0, x2: target.width, y2: target.height };
             start_blocks.push((BlockId::root(0), Block {
                 shape,
-                pieces: vec![(shape, Color([255, 255, 255, 255]))],
+                pieces: vec![(shape, Pic::Unicolor(Color([255, 255, 255, 255])))],
             }));
         }
 
