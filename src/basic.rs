@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::fmt::{Formatter, Write};
 use crate::image::Image;
 use crate::util::project_path;
+use crate::transform::{Transformation};
 
 #[derive(Clone, Copy, PartialEq, Eq, Default, Hash, PartialOrd, Ord)]
 pub struct Color(pub [u8; 4]);
@@ -880,6 +881,25 @@ impl Problem {
 
     pub fn shape(&self) -> Shape {
         Shape { x1: 0, y1: 0, x2: self.width, y2: self.height }
+    }
+
+    pub fn transform(p: &Problem, t: &Transformation) -> Problem {
+        let new_target = p.target.transform(t);
+        let new_width = new_target.width;
+        let new_height = new_target.height;
+        let new_initial_img = p.initial_img.as_ref().map(|img| img.transform(t));
+        let mut new_start_blocks = vec![];
+        for (block_id, block) in &p.start_blocks {
+            new_start_blocks.push((block_id.clone(), block.transform(t)));
+        }
+        Problem {
+            width: new_width,
+            height: new_height,
+            target: new_target,
+            initial_img: new_initial_img,
+            start_blocks: new_start_blocks,
+            base_costs: p.base_costs.clone(),
+        }
     }
 }
 

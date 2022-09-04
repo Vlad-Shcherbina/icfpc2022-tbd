@@ -1,0 +1,244 @@
+#![allow(dead_code)]
+
+use std::collections::HashMap;
+
+use crate::basic::*;
+use crate::image::Image;
+
+pub enum Transformation {
+    TransposeXY,
+    FlipY(i32)
+}
+
+fn transform_dimensions(width: i32, height: i32, t: &Transformation) -> (i32, i32) {
+    match t {
+        Transformation::TransposeXY => (height, width),
+        Transformation::FlipY(_) => (width, height),
+    }
+}
+
+fn transform_coords(x: i32, y: i32, t: &Transformation) -> (i32, i32) {
+    match t {
+        Transformation::TransposeXY => (y, x),
+        Transformation::FlipY(h) => (x, h - 1 - y),
+    }
+}
+
+impl Image {
+    pub fn transform(&self, t: &Transformation) -> Image {
+        let (w, h) = transform_dimensions(self.width, self.height, t);
+        let mut res = Image::new(w, h, Color::default());
+        for y in 0..self.height {
+            for x in 0..self.width {
+                let (x1, y1) = match t {
+                    Transformation::TransposeXY => (y, x),
+                    Transformation::FlipY(_) => (x, self.height - 1 - y),
+                };
+                res.set_pixel(x1, y1, self.get_pixel(x, y));
+            }
+        }
+        res
+    }
+}
+
+impl Shape {
+    pub fn transform(&self, t: &Transformation) -> Shape {
+        match t {
+            Transformation::TransposeXY => 
+                Shape {x1: self.y2, y1: self.x2, x2: self.y1, y2: self.x1},
+            Transformation::FlipY(h) =>
+                Shape {x1: self.x1, y1: h - 1 - self.y2, x2: self.x2, y2: h - 1 - self.y1},
+        }
+    }
+}
+
+impl Pic {
+    pub fn transform(&self, t: &Transformation) -> Pic {
+        match self {
+            Pic::Unicolor(_color) => self.clone(),
+            Pic::Bitmap(shape) => Pic::Bitmap(shape.transform(t)),
+        }
+    }
+}
+
+
+impl Block {
+    pub fn transform(&self, t: &Transformation) -> Block {
+        let mut new_pieces = vec![];
+        for (shape, pic) in &self.pieces {
+            new_pieces.push((shape.transform(t), pic.transform(t)));
+        }
+        Block {shape: self.shape.transform(t), pieces: new_pieces}
+    }
+}
+
+impl Orientation {
+    pub fn transform(&self, t: &Transformation) -> Orientation {
+        match t {
+            Transformation::TransposeXY => {
+                match self {
+                    Orientation::Vertical => Orientation::Horizontal,
+                    Orientation::Horizontal => Orientation::Vertical,
+                }
+            },
+            Transformation::FlipY(_) => *self
+        }
+    }
+}
+
+fn transform_line_number(line_number: i32, orientation: &Orientation, t: &Transformation) -> i32 {
+    match t {
+        Transformation::TransposeXY => line_number,
+        Transformation::FlipY(h) => {
+            match orientation {
+                Orientation::Vertical => line_number,
+                Orientation::Horizontal => h - 1 - line_number,
+            }
+        }
+    }
+}
+
+//fn dbg_print_map(block_id_map: &HashMap<BlockId, BlockId>) {
+//    for (k, v) in block_id_map {
+//        println!("{} -> {}", k, v);
+//    }
+//}
+
+fn transform_move(m: &Move, t: &Transformation, block_id_map: &mut HashMap<BlockId, BlockId>) -> Move {
+    //println!();
+    //dbg_print_map(&block_id_map);
+    match &m {
+        Move::PCut {
+            block_id,
+            x,
+            y,
+        } => {
+            let (x1, y1) = transform_coords(*x, *y, t);
+            let new_block_id = block_id_map[block_id].clone();
+            match t {
+                Transformation::TransposeXY => {
+                    block_id_map.insert(block_id.child(0), new_block_id.child(0));
+                    block_id_map.insert(block_id.child(2), new_block_id.child(2));
+                    block_id_map.insert(block_id.child(1), new_block_id.child(3));
+                    block_id_map.insert(block_id.child(3), new_block_id.child(1));
+                }
+                Transformation::FlipY(_) => {
+                    block_id_map.insert(block_id.child(0), new_block_id.child(3));
+                    block_id_map.insert(block_id.child(3), new_block_id.child(0));
+                    block_id_map.insert(block_id.child(1), new_block_id.child(2));
+                    block_id_map.insert(block_id.child(2), new_block_id.child(1));
+                }
+            }
+            Move::PCut {
+                block_id: new_block_id,
+                x: x1,
+                y: y1,
+            }
+        }
+        Move::LCut {
+            block_id,
+            orientation,
+            line_number,
+        } => {
+            let new_block_id = block_id_map[block_id].clone();
+            if orientation == &Orientation::Horizontal && matches!(t, Transformation::FlipY(_)) {
+                block_id_map.insert(block_id.child(0), new_block_id.child(1));
+                block_id_map.insert(block_id.child(1), new_block_id.child(0));
+            } else {
+                block_id_map.insert(block_id.child(0), new_block_id.child(0));
+                block_id_map.insert(block_id.child(1), new_block_id.child(1));
+            }
+            Move::LCut {
+                block_id: new_block_id,
+                orientation: orientation.transform(t),
+                line_number: transform_line_number(*line_number, orientation, t),
+            }
+        },
+        Move::ColorMove {
+            block_id,
+            color,
+        } => Move::ColorMove {
+            block_id: block_id_map[block_id].clone(),
+            color: *color,
+        },
+        Move::Swap {
+            block_id1,
+            block_id2,
+        } => Move::Swap {
+            block_id1: block_id_map[block_id1].clone(),
+            block_id2: block_id_map[block_id2].clone(),
+        },
+        Move::Merge {
+            block_id1,
+            block_id2,
+        } => Move::Merge {
+            block_id1: block_id_map[block_id1].clone(),
+            block_id2: block_id_map[block_id2].clone(),
+        },
+    }
+}
+
+
+pub fn transform_solution(moves: &Vec<Move>, t: &Transformation) -> Vec<Move> {
+    let mut res = vec![];
+    let mut block_id_map = HashMap::new();
+    block_id_map.insert(BlockId::root(0), BlockId::root(0));
+    for m in moves {
+        res.push(transform_move(m, t, &mut block_id_map));
+    }
+    res
+}
+
+fn assert_solutions_equal(moves1: &Vec<Move>, moves2: &Vec<Move>) {
+    assert_eq!(moves1.len(), moves2.len());
+    for (m1, m2) in moves1.iter().zip(moves2.iter()) {
+        assert_eq!(m1, m2);
+    }
+}
+
+//fn print_moves(moves: &Vec<Move>) {
+//    for m in moves {
+//        println!("{}", m);
+//    }
+//}
+
+#[test]
+fn test_transform_solution() {
+    let mut moves = vec![];
+
+    moves.push(Move::PCut { block_id: BlockId::root(0), x: 120, y: 170 });
+    moves.push(Move::LCut { block_id: BlockId::root(0).child(0), orientation: Orientation::Vertical, line_number: 30 });
+    moves.push(Move::LCut { block_id: BlockId::root(0).child(1), orientation: Orientation::Horizontal, line_number: 40});
+    moves.push(Move::ColorMove { block_id: BlockId::root(0).child(0).child(0), color: Color{0: [0,0,0,0]}});
+    moves.push(Move::ColorMove { block_id: BlockId::root(0).child(0).child(1), color: Color{0: [0,0,0,1]}});
+    moves.push(Move::ColorMove { block_id: BlockId::root(0).child(1).child(0), color: Color{0: [0,0,1,0]}});
+    moves.push(Move::ColorMove { block_id: BlockId::root(0).child(1).child(1), color: Color{0: [0,0,1,1]}});
+    moves.push(Move::ColorMove { block_id: BlockId::root(0).child(2), color: Color{0: [0,0,2,0]}});
+    moves.push(Move::ColorMove { block_id: BlockId::root(0).child(3), color: Color{0: [0,0,3,0]}});
+
+    //print_moves(&moves);
+
+    let mut transformed_moves = moves.clone();
+    for _ in 0..2 {
+        transformed_moves = transform_solution(&transformed_moves, &Transformation::TransposeXY);
+    }
+    assert_solutions_equal(&moves, &transformed_moves);
+
+    let mut transformed_moves = moves.clone();
+    for _ in 0..2 {
+        transformed_moves = transform_solution(&transformed_moves, &Transformation::FlipY(400));
+    }
+    assert_solutions_equal(&moves, &transformed_moves);
+
+    let mut transformed_moves = moves.clone();
+    transformed_moves = transform_solution(&transformed_moves, &Transformation::FlipY(400));
+    transformed_moves = transform_solution(&transformed_moves, &Transformation::TransposeXY);
+    transformed_moves = transform_solution(&transformed_moves, &Transformation::FlipY(400));
+    transformed_moves = transform_solution(&transformed_moves, &Transformation::TransposeXY);
+    transformed_moves = transform_solution(&transformed_moves, &Transformation::FlipY(400));
+    transformed_moves = transform_solution(&transformed_moves, &Transformation::TransposeXY);
+    transformed_moves = transform_solution(&transformed_moves, &Transformation::FlipY(400));
+    transformed_moves = transform_solution(&transformed_moves, &Transformation::TransposeXY);
+    assert_solutions_equal(&moves, &transformed_moves);
+
+}

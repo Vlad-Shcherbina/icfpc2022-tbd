@@ -16,6 +16,7 @@ mod seg_util;
 mod api;
 mod pack;
 mod stats;
+mod transform;
 
 crate::entry_point!("hello", hello);
 fn hello() {
