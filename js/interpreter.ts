@@ -176,7 +176,7 @@ refCanvas.addEventListener('mousemove', (evt) => {
 
 let currentIndex = 0;
 
-run.addEventListener('click', () => {
+run.addEventListener('click', async () => {
     const input = inputBox.value;
     const parsed = parser.parse(lex(input)).filter((x: any) => x !== null) as Command[];
     const blocks = new Map<string, Block>();
@@ -346,6 +346,8 @@ run.addEventListener('click', () => {
             }
             cost += this_step_cost;
             save_step(blocks, this_step_cost, cmd);
+            render(blocks);
+            await new Promise((resolve) => setTimeout(resolve, 0));
         }
     } catch (e) {
         errorSpan.innerText = `${(e as Error).message} in command ${cmdCount}: ${JSON.stringify(lastCmd)}`;
