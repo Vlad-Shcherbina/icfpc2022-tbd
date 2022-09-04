@@ -497,7 +497,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     referenceSelector.addEventListener('change', () => {
         loadReferenceImage();
     })
-    for(let i = 1; i<= 30; i++) {
+    for (let i = 1; i <= 35; i++) {
         const option = document.createElement('option');
         option.value = `${i}.png`;
         option.innerText = option.value;
