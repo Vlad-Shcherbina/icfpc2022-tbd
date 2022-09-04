@@ -1,8 +1,8 @@
-use std::{cmp::Ordering, collections::HashMap};
+use std::{cmp::Ordering, collections::HashMap, path::Path};
 
 use crate::{
     basic::{Color, Problem, Shape},
-    color_util::{color_freqs, optimal_color_for_color_freqs},
+    color_util::{closest_color_from_colors, color_freqs, optimal_color_for_color_freqs},
     image::Image,
 };
 
@@ -30,7 +30,18 @@ fn kyeet() {
 
     for problem_id in problem_range {
         let problem = Problem::load(problem_id);
-        kyeet_do(&KyeetArgs { dt: 100.0 }, &problem);
+        for dt in [
+            10.0, 20.0, 30.0, 40.0, 50.0, 75.0, 100.0, 110.0, 120.0, 130.0, 140.0, 150.0, 160.0,
+            170.0, 180.0, 190.0, 200.0, 210.0, 220.0, 230.0, 240.0, 250.0, 260.0, 270.0, 280.0,
+            290.0, 300.0, 400.0,
+        ] {
+            // let dt = 250.0;
+            let res = kyeet_do(&KyeetArgs { dt }, &problem);
+            res.save(Path::new(&format!(
+                "data/kyeet/{}/{:?}.png",
+                problem_id, dt
+            )));
+        }
     }
 }
 
@@ -74,9 +85,28 @@ fn kyeet_do(args: &KyeetArgs, problem: &Problem) -> Image {
         centered.insert(tube.0, tube.1);
     }
 
-    dbg!("Yoba {}", centered);
+    let colors = centered.keys();
+    let mut colors_vec = vec![];
 
-    Image::new(1, 1, Color([255, 255, 255, 255]))
+    for ccc in colors {
+        colors_vec.push(ccc.clone());
+    }
+
+    // dbg!("Yoba {}", colors.clone());
+
+    let mut res = problem.target.clone();
+
+    for ix in 0..problem.target.width {
+        for iy in 0..problem.target.height {
+            let c = problem.target.get_pixel(ix, iy);
+            // TODO: consider weights?!
+            res.set_pixel(ix, iy, closest_color_from_colors(&c, &colors_vec));
+        }
+    }
+
+    // Image::new(1, 1, Color([255, 255, 255, 255]))
+
+    res
 }
 
 fn index_cfs(cfs: HashMap<Color, f64>) -> (Vec<(f64, Color)>, Vec<Color>) {

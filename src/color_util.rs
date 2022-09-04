@@ -177,6 +177,21 @@ fn climb(color_freqs: &HashMap<Color, f64>, mut color: Color) -> Color {
     }
 }
 
+// TODO: consider weights?!
+pub fn closest_color_from_colors(color: &Color, colors: &Vec<Color>) -> Color {
+    let p = colors.first().unwrap();
+    let mut d = color.clone().dist(p).clone();
+    let mut curr = p.clone();
+    for x in colors {
+        let d1 = color.clone().dist(x).clone();
+        if d1 < d {
+            d = d1;
+            curr = x.clone();
+        }
+    }
+    curr
+}
+
 pub fn optimal_color_for_color_freqs(color_freqs: &HashMap<Color, f64>) -> Color {
     let color = modified_weiszfeld(color_freqs, 10);
     climb(color_freqs, color)

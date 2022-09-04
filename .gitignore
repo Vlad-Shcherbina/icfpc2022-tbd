@@ -1,3 +1,4 @@
 *.js
 *.js.map
 .direnv/
+data/kyeet/
