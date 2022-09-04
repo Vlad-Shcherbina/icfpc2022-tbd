@@ -5,7 +5,7 @@ use crate::image::{Image};
 use crate::invocation::{record_this_invocation, Status};
 use crate::uploader::upload_solution;
 
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap};
 
 struct State<'a> {
     painter_state: PainterState<'a>,
@@ -28,23 +28,6 @@ impl<'a> State<'a> {
         }
         assert_eq!(tile_size * tile_size * painter_state.blocks.len() as i32, problem.width * problem.height);
 
-        let mut initial_palette = HashSet::<Color>::new();
-        for block in painter_state.blocks.values() {
-            let color = match block.pieces[0].1 {
-                Pic::Unicolor(color) => color,
-                Pic::Bitmap(_) => todo!(),
-            };
-            initial_palette.insert(color);
-        }
-        let mut color_distances = HashMap::<(Color, i32, i32), f64>::new();
-        for &color in &initial_palette {
-            for i in 0..problem.width/tile_size {
-                for j in 0..problem.height/tile_size {
-                    let shape = Shape {x1: i*tile_size, y1: j*tile_size, x2: (i+1)*tile_size, y2: (j+1)*tile_size};
-                    color_distances.insert((color, i, j), image_slice_distance_to_color(&problem.target, shape, &color));
-                }
-            }
-        }
         let target = problem.target.clone();
         let distances = Self::compute_distances(&painter_state, &target);
         State {
@@ -62,7 +45,7 @@ impl<'a> State<'a> {
         let img = painter_state.render();
         for (block_id1, block1) in &painter_state.blocks {
             for block2 in painter_state.blocks.values() {
-                let distance = image_slices_distance(&img, &target, block1.shape, block2.shape);
+                let distance = image_slices_distance(&img, target, block1.shape, block2.shape);
                 distances.insert((block_id1.clone(), block2.shape), distance);
             }
         }
@@ -72,11 +55,6 @@ impl<'a> State<'a> {
     
     fn solve(&mut self) -> Vec<Move> {
         let mut moves = vec![];
-        //let mut cost = 0;
-        //let mut block_id = BlockId::root(0);
-        //let w_n = self.width / self.tile_size;
-        //let h_n = self.height / self.tile_size;
-        
         // Swap cost
         let ApplyMoveResult{cost, new_block_ids: _} =
             self.painter_state.apply_move(&Move::Swap {

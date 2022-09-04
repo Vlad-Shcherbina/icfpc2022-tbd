@@ -756,7 +756,7 @@ pub fn image_slices_distance(img1: &Image, img2: &Image, shape1: Shape, shape2: 
 }
 
 pub fn image_slice_distance(img1: &Image, img2: &Image, shape: Shape) -> f64 {
-    return image_slices_distance(img1, img2, shape, shape);
+    image_slices_distance(img1, img2, shape, shape)
 }
 
 pub fn image_distance(img1: &Image, img2: &Image) -> f64 {
