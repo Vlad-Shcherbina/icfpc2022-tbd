@@ -407,26 +407,24 @@ impl Block {
                p.0.y2 <= shape.y1 || p.0.y1 >= shape.y2 {
                 continue;
             }
+            let new_shape = Shape {
+                x1: p.0.x1.max(shape.x1),
+                y1: p.0.y1.max(shape.y1),
+                x2: p.0.x2.min(shape.x2),
+                y2: p.0.y2.min(shape.y2),
+            };
             let sub_pic = match &p.1 {
                 Pic::Unicolor(c) => Pic::Unicolor(*c),
                 Pic::Bitmap(s) => {
                     Pic::Bitmap(Shape {
-                        x1: s.x1 + shape.x1 - p.0.x1,
-                        y1: s.y1 + shape.y1 - p.0.y1,
-                        x2: s.x2 + shape.x2 - p.0.x2,
-                        y2: s.y2 + shape.y2 - p.0.y2,
+                        x1: s.x1 + new_shape.x1 - p.0.x1,
+                        y1: s.y1 + new_shape.y1 - p.0.y1,
+                        x2: s.x2 + new_shape.x2 - p.0.x2,
+                        y2: s.y2 + new_shape.y2 - p.0.y2,
                     })
                 }
             };
-            pieces.push((
-                Shape {
-                    x1: p.0.x1.max(shape.x1),
-                    y1: p.0.y1.max(shape.y1),
-                    x2: p.0.x2.min(shape.x2),
-                    y2: p.0.y2.min(shape.y2),
-                },
-                sub_pic,
-            ));
+            pieces.push((new_shape, sub_pic));
         }
         Block {
             shape,

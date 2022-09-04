@@ -12,7 +12,7 @@ use crate::util::project_path;
 
 crate::entry_point!("spot_solver", spot_solver);
 fn spot_solver() {
-    let problem_id = 18;
+    let problem_id = 40;
     let mut best_score = 1_000_000_000;
     let mut best_moves = vec![];
     let mut best_rects = vec![];
@@ -24,8 +24,8 @@ fn spot_solver() {
 
         let mut rects = vec![];
         if thread_rng().gen_bool(0.5) {
-            rects.push(Shape { x1: 0, y1: 0, x2: 400, y2: 400 });
-            for _ in 0..thread_rng().gen_range(0..10) {
+            // rects.push(Shape { x1: 0, y1: 0, x2: 400, y2: 400 });
+            for _ in 0..thread_rng().gen_range(1..10) {
                 let w = thread_rng().gen_range(100..problem.target.width + 1);
                 let h = thread_rng().gen_range(100..problem.target.height + 1);
                 let x1 = thread_rng().gen_range(0..problem.target.width - w + 1);
@@ -105,4 +105,10 @@ fn spot_solver() {
         painter.apply_move(m);
     }
     painter.render().save(&project_path("outputs/spot.png"));
+
+    let mut client = crate::db::create_client();
+    let mut tx = client.transaction().unwrap();
+    let incovation_id = record_this_invocation(&mut tx, Status::Stopped);
+    upload_solution(&mut tx, problem_id, &best_moves, "spot", &serde_json::Value::Null, incovation_id);
+    tx.commit().unwrap();
 }
