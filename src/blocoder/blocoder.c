@@ -106,6 +106,10 @@ void BloCoder_Update(BloCoder *blocoder) {
 
 /* ------------------------------------------------------------------------ */
 
+//void BloCoder_MergeAll
+
+/* ------------------------------------------------------------------------ */
+
 void BloCoder_PrintValidBlocks(const BloCoder *blo) {
     for (int i=0; i<DArray_NofElems(blo->blockdata); i++) {
         BlockData *b = (BlockData *)DArray_Elem(blo->blockdata, i);
@@ -966,16 +970,19 @@ int main(int argc, String **argv) {
  
         BloCoder_Reset(blocoder);
         BloCoder_ApplySeq(blocoder, bestseq);
+        opscore = bestseq->opscore;
         
         for (int i=0; i<DArray_NofElems(blocoder->blockdata); i++) {
             BlockData *bd = (BlockData *)DArray_Elem(blocoder->blockdata, i);
             if (bd->valid) {
                 ISLSeq *sol = ISLSeq_Create();
+                printf("Problem %2i : processing block %i/%i\n", id, i, DArray_NofElems(blocoder->blockdata));
                 BloCoder_Solver(blocoder, bd, isl, &islc, 2, opscore, bestscore, TRUE);
                 for (int j=0; j<islc; j++) ISLSeq_Add(sol, ISL_Clone(isl+j));
                 if (BloCoder_ScoreSeq(blocoder, sol) < bestsol->score) {
-                    ISLSeq *temp = ISLSeq_Clone(bestseq);                    
+                    ISLSeq *temp = ISLSeq_Clone(bestseq);
                     ISLSeq_Append(temp, sol);
+                    ISLSeq_CleanRedundantPaints(temp);
                     printf("Problem %2i : writing intermediate step approximate score %i\n---------------------------------\n", id, temp->score);
                     ISLSeq_ToFile(temp, id);
                     printf("----------------------------------\n");
@@ -983,6 +990,7 @@ int main(int argc, String **argv) {
 
                     ISLSeq_Destroy(bestsol);
                     bestsol = ISLSeq_Clone(sol);
+                    ISLSeq_CleanRedundantPaints(bestsol);
                     
                     improved = TRUE;
                 }

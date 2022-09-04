@@ -18,6 +18,8 @@ void BlockData_Print(const BlockData *b) {
     printf("}\n");
 }
 */
+/* ------------------------------------------------------------------------ */
+
 void BlockData_UpdateBBox(BlockData *parent) {
     int xmin = BlockData_X(parent, 0);
     int ymin = BlockData_Y(parent, 0);
@@ -34,6 +36,8 @@ void BlockData_UpdateBBox(BlockData *parent) {
     parent->ul = IntCoord_Construct(xmin, ymin);
     parent->br = IntCoord_Construct(xmax, ymax);
 }
+
+/* ------------------------------------------------------------------------ */
 
 /* (x1,y1) and (x2,y2) are diagonally opposite */
 BlockData *BlockData_CreateRect(blockid id, int x1, int y1, int x2, int y2) {
@@ -52,6 +56,8 @@ BlockData *BlockData_CreateRect(blockid id, int x1, int y1, int x2, int y2) {
 
     return bl;
 }
+
+/* ------------------------------------------------------------------------ */
 
 /* Requires manual setting of ID after calling ! */
 BlockData *BlockData_CreateMerge(const BlockData *b1, const BlockData *b2) {
@@ -84,6 +90,8 @@ BlockData *BlockData_CreateMerge(const BlockData *b1, const BlockData *b2) {
     return bl;
 }
 
+/* ------------------------------------------------------------------------ */
+
 BlockData *BlockData_Clone(const BlockData *b) {
     BlockData *ret = Memory_Reserve(1, BlockData);
     Memory_Copy(ret, b, sizeof(BlockData));
@@ -93,6 +101,22 @@ BlockData *BlockData_Clone(const BlockData *b) {
     Memory_Copy(ret->coord, b->coord, ret->nof_coords*sizeof(IntCoord));
     return ret;
 }
+
+/* ------------------------------------------------------------------------ */
+
+Bool BlockData_IsMergeable(const BlockData *b1, const BlockData *b2) {
+    return FALSE;
+}
+
+/* ------------------------------------------------------------------------ */
+
+Bool BlockData_IsSwappable(const BlockData *b1, const BlockData *b2) {
+    int w = IntCoord_X(b1->br) - IntCoord_X(b1->ul);
+    int h = IntCoord_Y(b1->br) - IntCoord_Y(b1->ul);
+    return IntCoord_X(b2->br) - IntCoord_X(b2->ul) == w && IntCoord_Y(b2->br) - IntCoord_Y(b2->ul);
+}
+
+/* ------------------------------------------------------------------------ */
 
 void BlockData_Destroy(BlockData *bd) {
     Memory_Free(bd->coord, IntCoord);

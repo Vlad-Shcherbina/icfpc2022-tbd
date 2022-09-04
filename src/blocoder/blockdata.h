@@ -21,6 +21,7 @@ BlockData *BlockData_CreateRect(blockid id, int x1, int y1, int x2, int y2);
 /* Requires manual setting of ID after calling ! */
 BlockData *BlockData_CreateMerge(const BlockData *b1, const BlockData *b2);
 BlockData *BlockData_Clone(const BlockData *b);
+Bool BlockData_IsMergeable(const BlockData *b1, const BlockData *b2);
 void BlockData_Destroy(BlockData *bd);
 int BlockData_X(const BlockData *bd, int n);
 int BlockData_Y(const BlockData *bd, int n);
