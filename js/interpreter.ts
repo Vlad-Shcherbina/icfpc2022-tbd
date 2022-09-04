@@ -553,3 +553,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         run.click();
     }
 });
+
+document.getElementById('clear')!.addEventListener('click', () => {
+    inputBox.value = "";
+})
