@@ -1,6 +1,7 @@
 #![allow(unused_imports)]
 
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap, BTreeMap};
+use std::sync::Mutex;
 use rand::prelude::*;
 use crate::util::project_path;
 use crate::basic::*;
@@ -12,13 +13,6 @@ use crate::seg_util;
 
 use crate::basic::Move::*;
 
-#[derive(serde::Serialize)]
-#[derive(Debug)]
-struct SolverArgs {
-    px: i32,
-    py: i32,
-    num_colors: usize,
-}
 
 crate::entry_point!("brick_solver", brick_solver);
 fn brick_solver() {
@@ -27,26 +21,74 @@ fn brick_solver() {
     let dry_run = pargs.contains("--dry-run");
     let rest = pargs.finish();
     assert!(rest.is_empty(), "unrecognized arguments {:?}", rest);
-
     let problem_range = crate::util::parse_range(&problems);
+
     let mut client = crate::db::create_client();
-    let start = std::time::Instant::now();
-    for problem_id in problem_range {
-        eprintln!("*********** problem {} ***********", problem_id);
-        let problem = Problem::load(problem_id);
-        let moves = solve(&problem);
-        let mut tx = client.transaction().unwrap();
-        let incovation_id = record_this_invocation(&mut tx, Status::Stopped);
-        upload_solution(&mut tx, problem_id, &moves, "brick", &serde_json::Value::Null, incovation_id);
-        if dry_run {
-            eprintln!("But not really, because it was a --dry-run!");
-            break;  // because record_this_invocation() doesn't play well with reverted transactions
-        } else {
-            tx.commit().unwrap();
+    let rows = client.query("SELECT problem_id, moves_cost + image_distance AS score FROM solutions", &[]).unwrap();
+    let mut best_scores: BTreeMap<i32, i64> = problem_range.clone().map(|i| (i, i64::MAX)).collect();
+    for row in rows {
+        let problem_id: i32 = row.get("problem_id");
+        let score: i64 = row.get("score");
+        if let Some(e) = best_scores.get_mut(&problem_id) {
+            *e = (*e).min(score);
         }
     }
-    eprintln!("it took {:?}", start.elapsed());
-    eprintln!("{}", crate::stats::STATS.render());
+    eprintln!("{:?}", best_scores);
+    let improvements: HashMap<i32, Vec<Move>> = HashMap::new();
+
+    let client = Mutex::new(client);
+    let improvements = Mutex::new(improvements);
+    let best_scores: BTreeMap<_, _> = best_scores.into_iter().map(|(k, v)| (k, Mutex::new(v))).collect();
+    std::thread::scope(|scope| {
+        // imrovement submitter thread
+        scope.spawn(|| {
+            loop {
+                std::thread::sleep(std::time::Duration::from_secs(60));
+                let improvements = &mut *improvements.lock().unwrap();
+                eprintln!("submitting {} improvements", improvements.len());
+                let client = &mut *client.lock().unwrap();
+                let mut tx = client.transaction().unwrap();
+                let incovation_id = record_this_invocation(&mut tx, Status::KeepRunning { seconds: 65.0 });
+                if improvements.is_empty() {
+                    for (problem_id, moves) in improvements.drain() {
+                        if dry_run {
+                            eprintln!("dry run: pretend submit improvement for problem {}", problem_id);
+                        } else {
+                            upload_solution(&mut tx, problem_id, &moves, "brick", &serde_json::Value::Null, incovation_id);
+                        }
+                    }
+                }
+                tx.commit().unwrap();
+                eprintln!("{}", crate::stats::STATS.render());
+            }
+        });
+
+        for problem_id in problem_range {
+            let best_score = &best_scores[&problem_id];
+            let improvements = &improvements;
+            scope.spawn(move || {
+                let problem = Problem::load(problem_id);
+                let mut painter = PainterState::new(&problem);
+                let (_, initial_moves) = seg_util::merge_all(&mut painter);
+                loop {
+                    let ys = random_seps();
+                    let mut xss = vec![];
+                    for _ in 1..ys.len() {
+                        xss.push(random_seps());
+                    }
+                    let (score, moves) = do_bricks(&problem, &initial_moves, ys, xss);
+                    // eprintln!("{} {}", problem_id, score);
+                    let best_score = &mut *best_score.lock().unwrap();
+                    if score < *best_score {
+                        eprintln!("improvement for problem {}: {} -> {}", problem_id, *best_score, score);
+                        *best_score = score;
+                        let improvements = &mut *improvements.lock().unwrap();
+                        improvements.insert(problem_id, moves);
+                    }
+                }
+            });
+        }
+    });
 }
 
 fn random_seps() -> Vec<i32> {
@@ -64,32 +106,6 @@ fn random_seps() -> Vec<i32> {
     let mut res: Vec<i32> = res.into_iter().collect();
     res.sort();
     res
-}
-
-fn solve(problem: &Problem) -> Vec<Move> {
-    let _t = crate::stats_timer!("solve").time_it();
-    let mut painter = PainterState::new(problem);
-
-    let (_, initial_moves) = seg_util::merge_all(&mut painter);
-
-    let mut best_moves = vec![];
-    let mut best_score = i64::MAX;
-
-    for _ in 0..200 {
-        let ys = random_seps();
-        let mut xss = vec![];
-        for _ in 1..ys.len() {
-            xss.push(random_seps());
-        }
-        let (score, moves) = do_bricks(problem, &initial_moves, ys, xss);
-        if score < best_score {
-            dbg!(score);
-            best_score = score;
-            best_moves = moves;
-        }
-    }
-
-    best_moves
 }
 
 fn do_bricks(problem: &Problem, initial_moves: &[Move], mut ys: Vec<i32>, mut xss: Vec<Vec<i32>>) -> (i64, Vec<Move>) {
