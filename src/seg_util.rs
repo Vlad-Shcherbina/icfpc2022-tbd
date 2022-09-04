@@ -90,6 +90,7 @@ pub fn isolate_rect(p: &mut PainterState, mut root_id: BlockId, rect: Shape) -> 
 }
 
 struct State {
+    start: std::time::Instant,
     cnt: usize,
     items: Vec<(bool, Shape)>,
     plan: Vec<(usize, usize)>,
@@ -102,6 +103,7 @@ struct State {
 fn plan_merge_all(canvas_size: i32, shapes: &[Shape]) -> Vec<(usize, usize)> {
     // TODO: choose best cost
     let mut state = State {
+        start: std::time::Instant::now(),
         cnt: shapes.len(),
         items: shapes.iter().map(|&s| (true, s)).collect(),
         plan: vec![],
@@ -111,6 +113,9 @@ fn plan_merge_all(canvas_size: i32, shapes: &[Shape]) -> Vec<(usize, usize)> {
         canvas_size,
     };
     fn rec(state: &mut State) {
+        if state.start.elapsed() > std::time::Duration::from_secs(1) {
+            return;
+        }
         if state.cnt == 1 {
             if state.cost < state.best_cost {
                 state.best_cost = state.cost;
@@ -155,9 +160,12 @@ fn plan_merge_all(canvas_size: i32, shapes: &[Shape]) -> Vec<(usize, usize)> {
 }
 
 pub fn merge_all(p: &mut PainterState) -> (BlockId, Vec<Move>) {
+    let _t = crate::stats_timer!("merge_all").time_it();
     let mut shapes: Vec<Shape> = vec![];
     let mut ids: Vec<BlockId> = vec![];
-    for (id, block) in &p.blocks {
+    let mut id_blocks: Vec<_> = p.blocks.iter().collect();
+    id_blocks.sort_by_key(|&(id, _)| id.clone());
+    for (id, block) in id_blocks {
         shapes.push(block.shape);
         ids.push(id.clone());
     }
@@ -181,6 +189,7 @@ pub fn merge_all(p: &mut PainterState) -> (BlockId, Vec<Move>) {
 
 
 pub fn merge_all_2(p: &mut PainterState) -> (BlockId, Vec<Move>) {
+    let _t = crate::stats_timer!("merge_all_2").time_it();
     let mut moves = vec![];
     let mut id = p.blocks.keys().next().unwrap().clone();
 

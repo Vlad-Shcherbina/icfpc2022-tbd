@@ -130,7 +130,14 @@ fn solve(args: &SolverArgs, problem: &Problem) -> (i64, Vec<Move>) {
 
     let mut painter = PainterState::new(problem);
     let mut all_moves = vec![];
-    let mut root = BlockId::root(0);
+
+    // let mut root = painter.blocks.keys().next().unwrap().clone();
+    eprintln!("merging...");
+    let (mut root, moves) = seg_util::merge_all(&mut painter);
+    eprintln!("done");
+    all_moves.extend(moves);
+    assert_eq!(painter.blocks.len(), 1);
+
     for (shape, color) in &rects {
         let (id, moves) = seg_util::isolate_rect(&mut painter, root, *shape);
         all_moves.extend(moves);

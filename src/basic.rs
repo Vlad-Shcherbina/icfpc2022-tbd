@@ -33,7 +33,7 @@ pub enum Orientation {
 }
 use Orientation::*;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct BlockId(Vec<usize>);
 
 impl BlockId {
