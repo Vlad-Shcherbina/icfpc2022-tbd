@@ -125,11 +125,11 @@ fn plan_merge_all(canvas_size: i32, shapes: &[Shape]) -> Vec<(usize, usize)> {
             return;
         }
 
-        for i in 0..state.items.len() {
+        for i in (0..state.items.len()).rev() {
             if !state.items[i].0 {
                 continue;
             }
-            for j in i + 1 .. state.items.len() {
+            for j in (0..i).rev() {
                 if !state.items[j].0 {
                     continue;
                 }
@@ -164,7 +164,7 @@ pub fn merge_all(p: &mut PainterState) -> (BlockId, Vec<Move>) {
     let mut shapes: Vec<Shape> = vec![];
     let mut ids: Vec<BlockId> = vec![];
     let mut id_blocks: Vec<_> = p.blocks.iter().collect();
-    id_blocks.sort_by_key(|&(id, _)| id.clone());
+    id_blocks.sort_by_key(|&(_, b)| b.shape);
     for (id, block) in id_blocks {
         shapes.push(block.shape);
         ids.push(id.clone());

@@ -256,7 +256,7 @@ color [0.1] [1, 2, 3, 4]
 ");
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Shape {
     pub x1: i32,
     pub y1: i32,
