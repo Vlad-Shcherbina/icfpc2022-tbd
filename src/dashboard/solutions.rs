@@ -15,40 +15,6 @@ use super::dev_server::{Request, ResponseBuilder, HandlerResult};
 pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: ResponseBuilder) -> HandlerResult {
     if req.path.is_empty() {
         let client = &mut state.lock().unwrap().client;
-        let best_query = "
-        SELECT
-            id,
-            problem_id,
-            data,
-            moves_cost,
-            image_distance,
-            solver,
-            solver_args,
-            invocation_id,
-            timestamp
-        FROM solutions s1
-        WHERE (image_distance + moves_cost) = (
-            SELECT MIN ( s2.image_distance + s2.moves_cost )
-            FROM solutions s2
-            WHERE s1.problem_id = s2.problem_id
-        ) AND ($1 = -1 OR $1 = s1.problem_id)
-        ORDER BY problem_id DESC
-        ";
-
-        let all_query = "
-        SELECT
-            id,
-            problem_id,
-            data,
-            moves_cost,
-            image_distance,
-            solver,
-            solver_args,
-            invocation_id,
-            timestamp
-        FROM solutions
-        WHERE $1 = -1 OR $1 = problem_id
-        ";
 
         let archive = req.query_args.remove("archive");
         let problem_id: i32 = req.query_args.remove("problem_id").map_or(-1, |s| s.parse().unwrap());
@@ -57,18 +23,25 @@ pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: Respo
             Some(x) => x == "true",
             None => false
         };
-        let query = if archive {
-            all_query
-        } else {
-            best_query
-        };
-
-        eprintln!("RUNNING: {}", query);
-
         let opts = SolutionsOpts { archive };
 
-        let raw_rows = client.query(query, &[&problem_id]).unwrap();
-        let rows = raw_rows.into_iter().map(|row| {
+        let mut problem_id_to_rows: HashMap<i32, Vec<SolutionRow>> = HashMap::new();
+        let raw_rows = client.query("
+            SELECT
+                id,
+                problem_id,
+                data,
+                moves_cost,
+                image_distance,
+                solver,
+                solver_args,
+                invocation_id,
+                timestamp
+            FROM solutions
+            WHERE $1 = -1 OR $1 = problem_id
+            ORDER BY timestamp
+        ", &[&problem_id]).unwrap();
+        for row in raw_rows {
             let id: i32 = row.get("id");
             let problem_id: i32 = row.get("problem_id");
             // let data: String = row.get("data");
@@ -81,8 +54,19 @@ pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: Respo
             let timestamp: DateTime = row.get("timestamp");
 
             let solver_args = serde_json::to_string(&solver_args.0).unwrap();
-            SolutionRow { id, problem_id, /* data, */ moves_cost, image_distance, score, solver_name, solver_args, invocation_id, timestamp }
-        }).collect();
+            let sr = SolutionRow { id, problem_id, /* data, */ moves_cost, image_distance, score, solver_name, solver_args, invocation_id, timestamp };
+            problem_id_to_rows.entry(problem_id).or_default().push(sr);
+        }
+        if !archive {
+            for rows in problem_id_to_rows.values_mut() {
+                let best = rows.iter().min_by_key(|r| (r.score, r.timestamp)).unwrap();
+                *rows = vec![best.clone()];
+            }
+        }
+
+        let mut problem_id_to_rows: Vec<_> = problem_id_to_rows.into_iter().collect();
+        problem_id_to_rows.sort_by_key(|(problem_id, _)| *problem_id);
+        let rows: Vec<SolutionRow> = problem_id_to_rows.into_iter().flat_map(|q| q.1.into_iter()).collect();
         let s = SolutionsTemplate {opts, rows}.render().unwrap();
         return resp.code("200 OK").body(s);
     }
@@ -181,6 +165,7 @@ fn data_uri(data: &[u8], mime_type: &str) -> String {
     s
 }
 
+#[derive(Clone)]
 struct SolutionRow {
     id: i32,
     problem_id: i32,
