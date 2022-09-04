@@ -17,7 +17,6 @@ whoami = "*"
 chrono = { version = "*", default-features = false, features = ["std"] }
 image = { version = "*", default-features = false, features = ["png"] }
 pico-args = { version = "*", features = ["eq-separator"] }
-rstats = "^1"
 base64 = "*"
 rand = "*"
 ureq = { version = "*", features = ["json"] }

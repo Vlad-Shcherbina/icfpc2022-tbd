@@ -3,7 +3,7 @@ use crate::basic::*;
 use crate::basic::Move::PCut;
 use crate::invocation::{record_this_invocation, Status};
 use crate::uploader::upload_solution;
-use crate::color_util::gmedian_color;
+use crate::color_util::optimal_color_for_block;
 
 struct State {
     img: Image,
@@ -30,8 +30,7 @@ impl State {
     }
 
     fn average_color(&self, shape: Shape) -> Color {
-        gmedian_color(&self.img, shape)
-        //mean(&self.img, shape)
+        optimal_color_for_block(&self.img, &shape)
     }
 
     fn qtree_stop_here_recolor_cost(&self, shape: Shape, block_id: BlockId) -> i64 {

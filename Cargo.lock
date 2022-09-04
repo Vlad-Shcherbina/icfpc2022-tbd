@@ -485,7 +485,6 @@ dependencies = [
  "rand 0.8.5",
  "rand_chacha 0.1.1",
  "rand_core 0.3.1",
- "rstats",
  "serde",
  "serde_json",
  "ureq",
@@ -528,12 +527,6 @@ dependencies = [
  "num-traits",
  "png",
 ]
-
-[[package]]
-name = "indxvec"
-version = "1.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "949c9441df3d9a94da27608ab8430a9fb5c633e9fb430976f1d3cf8faa78bb47"
 
 [[package]]
 name = "instant"
@@ -654,15 +647,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "274fd6bd98a3c75c9515d9393b063099f60f9b47f09ee20a34fd76287fd017f4"
 dependencies = [
  "digest",
-]
-
-[[package]]
-name = "medians"
-version = "1.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d500f5de76c35a2efd854cbf1fe4ed76bacc83591faa33a8ddc40757af6e16d5"
-dependencies = [
- "indxvec",
 ]
 
 [[package]]
@@ -1250,16 +1234,6 @@ dependencies = [
  "untrusted",
  "web-sys",
  "winapi",
-]
-
-[[package]]
-name = "rstats"
-version = "1.2.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "153de97f3cf257ce24445c1cf83001e5f919d69e1a23f5e623f54d9e68b3c9f5"
-dependencies = [
- "indxvec",
- "medians",
 ]
 
 [[package]]

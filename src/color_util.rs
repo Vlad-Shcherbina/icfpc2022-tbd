@@ -4,7 +4,6 @@
 
 use fxhash::FxHashMap as HashMap;
 use rand::prelude::*;
-use rstats::{VecVec};
 use rand::prelude::*;
 
 use crate::basic::*;
@@ -291,29 +290,5 @@ pub fn mean_color(img: &Image, shape: Shape) -> Color {
         (g / pixels) as u8,
         (b / pixels) as u8,
         (a / pixels) as u8,
-    ])
-}
-
-// Geometric median calculated using Weiszfeld's algorithm.
-// Probably better than gradient descent.
-pub fn gmedian_color(img: &Image, shape: Shape) -> Color {
-    let mut colors = vec![];
-    for y in shape.y1..shape.y2 {
-        for x in shape.x1..shape.x2 {
-            colors.push(Vec::from(img.get_pixel(x, y).0));
-        }
-    }
-    let median = colors.gmedian(0.5);
-    for component in median.iter() {
-        if component.is_nan() {
-            // Fallback to mean. I've no idea why the median algorithm fails sometimes.
-            return mean_color(img,shape);
-        }
-    }
-    Color ([
-        median[0].round() as u8,
-        median[1].round() as u8,
-        median[2].round() as u8,
-        median[3].round() as u8,
     ])
 }
