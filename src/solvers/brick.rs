@@ -28,6 +28,7 @@ struct Shared {
 #[derive(Clone)]
 struct SolverArgs {
     transposed: bool,
+    granularity: i32,
     ys: Vec<i32>,
 }
 
@@ -36,6 +37,7 @@ fn brick_solver() {
     let mut pargs = pico_args::Arguments::from_vec(std::env::args_os().skip(2).collect());
     let problems: String = pargs.value_from_str("--problem").unwrap();
     let dry_run = pargs.contains("--dry-run");
+    let granularity: i32 = pargs.value_from_str("--granularity").unwrap();
     let rest = pargs.finish();
     assert!(rest.is_empty(), "unrecognized arguments {:?}", rest);
     let problem_range = crate::util::parse_range(&problems);
@@ -115,7 +117,7 @@ fn brick_solver() {
                             random_seps()
                         };
 
-                        let (dp_score, xss) = dp(&problem, ys.clone(), &mut wcache);
+                        let (dp_score, xss) = dp(&problem, ys.clone(), granularity, &mut wcache);
 
                         let mut sbr = simulate_bricks(&problem, ys.clone(), xss.clone(), &mut wcache);
                         assert!((sbr.score() as f64 - dp_score) <= 2.0);
@@ -149,6 +151,7 @@ fn brick_solver() {
                                 *best_score = br.score;
                                 let a = SolverArgs {
                                     transposed,
+                                    granularity,
                                     ys: ys.clone(),
                                 };
                                 shared.improvements.insert(problem_id, (a, moves));
@@ -216,11 +219,12 @@ struct SimulateBrickResult {
 
 crate::entry_point!("dp_demo", dp_demo, _EP2);
 fn dp_demo() {
+    let granularity = 10;
     let start = std::time::Instant::now();
     let problem = Problem::load(17);
     let mut wcache = WCache::new();
     let ys = vec![0, 200, 400];
-    let (score, xss) = dp(&problem, ys.clone(), &mut wcache);
+    let (score, xss) = dp(&problem, ys.clone(), granularity, &mut wcache);
     eprintln!("score: {}", score);
     for xs in &xss {
         eprintln!("xs = {:?}", xs)
@@ -244,7 +248,7 @@ fn dp_demo() {
     eprintln!("it took {:?}", start.elapsed());
 }
 
-fn dp(problem: &Problem, mut ys: Vec<i32>, wcache: &mut WCache) -> (f64, Vec<Vec<i32>>) {
+fn dp(problem: &Problem, mut ys: Vec<i32>, granularity: i32, wcache: &mut WCache) -> (f64, Vec<Vec<i32>>) {
     let _t = crate::stats_timer!("dp").time_it();
     let mut score = 0.0;
     ys[0] = 0;
@@ -268,7 +272,7 @@ fn dp(problem: &Problem, mut ys: Vec<i32>, wcache: &mut WCache) -> (f64, Vec<Vec
         }
 
         let last = i + 1 == ys.len();
-        let (row_score, xs) = row_dp(problem, y1, y2, yy2 - yy1, !last, wcache);
+        let (row_score, xs) = row_dp(problem, y1, y2, yy2 - yy1, !last, granularity, wcache);
         xss.push(xs);
         score += row_score;
 
@@ -287,20 +291,17 @@ fn dp(problem: &Problem, mut ys: Vec<i32>, wcache: &mut WCache) -> (f64, Vec<Vec
     (score, xss)
 }
 
-fn row_dp(problem: &Problem, y1: i32, y2: i32, h: i32, merge: bool, wcache: &mut WCache) -> (f64, Vec<i32>) {
+fn row_dp(problem: &Problem, y1: i32, y2: i32, h: i32, merge: bool, granularity: i32, wcache: &mut WCache) -> (f64, Vec<i32>) {
     let _t = crate::stats_timer!("row_dp").time_it();
     let mut best: HashMap<(i32, i32), (f64, Vec<i32>)> = HashMap::default();
 
-    const MOD: i32 = 10;
-    assert_eq!(problem.width % MOD, 0);
-
     for w in 1..=problem.width {
-        if w % MOD != 0 {
+        if w % granularity != 0 {
             continue;
         }
         // dbg!(w);
         for x1 in 0..=problem.width - w {
-            if x1 % MOD != 0 {
+            if x1 % granularity != 0 {
                 continue;
             }
             let x2 = x1 + w;
@@ -313,7 +314,7 @@ fn row_dp(problem: &Problem, y1: i32, y2: i32, h: i32, merge: bool, wcache: &mut
                 problem.cost(problem.base_costs.color, (x2 - x1) * h) as f64 +
                 problem.cost(problem.base_costs.lcut, (x2 - x1) * h) as f64;
             for x in x1 + 1 .. x2 {
-                if x % MOD != 0 {
+                if x % granularity != 0 {
                     continue;
                 }
                 // if !thread_rng().gen_bool(0.01) {
