@@ -89,7 +89,7 @@ fn brick_solver() {
         });
 
         for problem_id in problem_range {
-            let transposed = false;
+            let transposed = true;
 
             let local_best_score = &local_best_scores[&problem_id];
             let shared = &shared;
@@ -122,16 +122,11 @@ fn brick_solver() {
                             eprintln!("new best score for problem {}: {} -> {}", problem_id, *best_score, br.score);
                             let mut moves = br.moves;
                             if transposed {
-                                eprintln!("----");
-                                for m in &moves {
-                                    eprintln!("{}", m);
-                                }
-                                eprintln!("----");
                                 moves = transform_solution(&moves, &TransposeXY);
                             }
                             *best_score = br.score;
                             let a = SolverArgs {
-                                transposed: false,
+                                transposed,
                             };
                             shared.improvements.insert(problem_id, (a, moves));
                         }
