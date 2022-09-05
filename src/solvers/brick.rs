@@ -349,45 +349,6 @@ fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) ->
     ys[0] = 0;
     *ys.last_mut().unwrap() = problem.target.height;
 
-    /*
-    let y1 = ys[0];
-    let y2 = *ys.last().unwrap();
-    if y1 < problem.target.height - y2 {
-        if y1 > 0 {
-            // cut bottom margin
-            block_id = painter.apply_move(&Move::LCut {
-                block_id,
-                orientation: Orientation::Horizontal,
-                line_number: y1,
-            }).new_block_ids[1].clone();
-        }
-        if y2 < problem.target.height {
-            // cut top margin
-            block_id = painter.apply_move(&Move::LCut {
-                block_id,
-                orientation: Orientation::Horizontal,
-                line_number: y2,
-            }).new_block_ids[0].clone();
-        }
-    } else {
-        if y2 < problem.target.height {
-            // cut top margin
-            block_id = painter.apply_move(&Move::LCut {
-                block_id,
-                orientation: Orientation::Horizontal,
-                line_number: y2,
-            }).new_block_ids[0].clone();
-        }
-        if y1 > 0 {
-            // cut bottom margin
-            block_id = painter.apply_move(&Move::LCut {
-                block_id,
-                orientation: Orientation::Horizontal,
-                line_number: y1,
-            }).new_block_ids[1].clone();
-        }
-    }*/
-
     loop {
         let h = *ys.last().unwrap() - ys[0];
         let y1;
@@ -414,43 +375,6 @@ fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) ->
         // for different rows. They interfere.
         xs[0] = 0;
         *xs.last_mut().unwrap() = problem.target.width;
-
-        /*
-        // horizontal prunning
-        let x1 = xs[0];
-        let x2 = *xs.last().unwrap();
-
-        let left_to_right = x1 < problem.target.width - x2;
-        if left_to_right && x1 > 0 {
-            // cut left margin
-            let mut ids = painter.apply_move(&Move::LCut {
-                block_id,
-                orientation: Orientation::Vertical,
-                line_number: x1,
-            }).new_block_ids;
-            block_id = ids.pop().unwrap();
-            merge_stack.push(ids.pop().unwrap());
-        }
-        if x2 < problem.target.width {
-            // cut right margin
-            let mut ids = painter.apply_move(&Move::LCut {
-                block_id,
-                orientation: Orientation::Vertical,
-                line_number: x2,
-            }).new_block_ids;
-            merge_stack.push(ids.pop().unwrap());
-            block_id = ids.pop().unwrap();
-        }
-        if !left_to_right && x1 > 0 {
-            // cut left margin
-            let mut ids = painter.apply_move(&Move::LCut {
-                block_id,
-                orientation: Orientation::Vertical,
-                line_number: x1,
-            }).new_block_ids;
-            block_id = ids.pop().unwrap();
-            merge_stack.push(ids.pop().unwrap());
-        }*/
 
         let mut merge_cost = 0;
 
