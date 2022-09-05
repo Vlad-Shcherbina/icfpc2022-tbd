@@ -214,6 +214,24 @@ impl Blueprint {
     }
 }
 
+fn to_recipe(mut xs: Vec<i32>) -> Vec<i32> {
+    let mut res = vec![];
+    loop {
+        let left = xs[1] - xs[0];
+        let right = xs[xs.len() - 1] - xs[xs.len() - 2];
+        if left < right {
+            res.push(left);
+            xs.remove(0);
+        } else {
+            res.push(-right);
+            xs.pop().unwrap();
+        }
+        if xs.len() == 1 {
+            return res;
+        }
+    }
+}
+
 #[allow(dead_code)]
 struct SimulateBrickResult {
     dist: i64,
@@ -254,38 +272,39 @@ fn simulate_bricks(problem: &Problem, blueprint: Blueprint, wcache: &mut WCache)
         xs[0] = 0;
         *xs.last_mut().unwrap() = problem.target.width;
 
+        let xs = to_recipe(xs);
+
         let mut merge_cost = 0;
 
-        // horizontal cutting
-        loop {
-            let w = *xs.last().unwrap() - xs[0];
+        let mut xx1 = 0;
+        let mut xx2 = problem.width;
+
+        let cnt = xs.len();
+        for (i, sx) in xs.into_iter().enumerate() {
             let x1;
             let x2;
-            if xs[1] - xs[0] < xs[xs.len() - 1] - xs[xs.len() - 2] {
-                x1 = xs[0];
-                x2 = xs[1];
-                xs.remove(0);
+            if sx > 0 {
+                x1 = xx1;
+                x2 = xx1 + sx;
             } else {
-                x1 = xs[xs.len() - 2];
-                x2 = xs[xs.len() - 1];
-                xs.pop().unwrap();
+                x1 = xx2 + sx;
+                x2 = xx2;
             }
-
-            // let cf = crate::color_util::color_freqs(&problem.target, &Shape { x1, y1, x2, y2 });
-            // let color = crate::color_util::optimal_color_for_color_freqs(&cf);
-            // dist += crate::color_util::color_freqs_distance(&cf, color);
             dist += wcache.get_dist(Shape { x1, y1, x2, y2 }, problem);
+            cost += problem.cost(problem.base_costs.color, (xx2 - xx1) * h);
 
-            let dc = problem.cost(problem.base_costs.color, w * h);
-            cost += dc;
-
-            if xs.len() == 1 {
+            if i + 1 == cnt {
                 break;
             }
 
-            let dc = problem.cost(problem.base_costs.lcut, w * h);
-            cost += dc;
-            merge_cost += problem.cost(problem.base_costs.merge, (x2 - x1).max(w - (x2 - x1)) * h);
+            cost += problem.cost(problem.base_costs.lcut, (xx2 - xx1) * h);
+            merge_cost += problem.cost(problem.base_costs.merge, (x2 - x1).max((xx2 - xx1) - (x2 - x1)) * h);
+
+            if sx > 0 {
+                xx1 += sx;
+            } else {
+                xx2 += sx;
+            }
         }
 
         if ys.len() == 1 {
