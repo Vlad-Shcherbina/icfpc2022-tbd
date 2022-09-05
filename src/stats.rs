@@ -99,8 +99,8 @@ impl Counter {
 
 #[derive(Default)]
 pub struct Timer {
-    count: Counter,
-    duration: Counter,
+    pub count: Counter,
+    pub duration: Counter,
 }
 
 impl Timer {

@@ -50,6 +50,7 @@ fn brick_solver() {
     std::thread::scope(|scope| {
         // imrovement submitter thread
         scope.spawn(|| {
+            let start = std::time::Instant::now();
             loop {
                 std::thread::sleep(std::time::Duration::from_secs(60));
                 let shared = &mut *shared.lock().unwrap();
@@ -71,6 +72,10 @@ fn brick_solver() {
                 for (problem_id, best_score) in &shared.best_scores {
                     eprintln!("problem {}:  our {},  best {}", problem_id, local_best_scores[problem_id].load(SeqCst), best_score);
                 }
+
+                let q = crate::stats_timer!("do_bricks").count.get() as f64 / start.elapsed().as_secs_f64();
+                eprintln!("{} do_bricks per second", q.round() as i64);
+                eprintln!();
             }
         });
 
@@ -90,18 +95,18 @@ fn brick_solver() {
                     } else {
                         Blueprint::random()
                     };
-                    let (score, moves) = do_bricks(&problem, &initial_moves, blueprint.clone());
+                    let br = do_bricks(&problem, &initial_moves, blueprint.clone());
                     // eprintln!("{} {}", problem_id, score);
-                    if score < local_best_score.load(SeqCst) {
-                        local_best_score.store(score, SeqCst);
-                        eprintln!("improvement for problem {}: {}", problem_id, score);
+                    if br.score < local_best_score.load(SeqCst) {
+                        local_best_score.store(br.score, SeqCst);
+                        eprintln!("improvement for problem {}: {}", problem_id, br.score);
                         best_blueprint = blueprint;
                         let shared = &mut *shared.lock().unwrap();
                         let best_score = shared.best_scores.get_mut(&problem_id).unwrap();
-                        if score < *best_score {
-                            eprintln!("new best score for problem {}: {} -> {}", problem_id, *best_score, score);
-                            *best_score = score;
-                            shared.improvements.insert(problem_id, moves);
+                        if br.score < *best_score {
+                            eprintln!("new best score for problem {}: {} -> {}", problem_id, *best_score, br.score);
+                            *best_score = br.score;
+                            shared.improvements.insert(problem_id, br.moves);
                         }
                     }
                 }
@@ -170,14 +175,23 @@ impl Blueprint {
     }
 }
 
-fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) -> (i64, Vec<Move>) {
+struct BrickResult {
+    score: i64,
+    dist: i64,
+    cost: i64,
+    moves: Vec<Move>,
+}
+fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) -> BrickResult {
     let _t = crate::stats_timer!("do_bricks").time_it();
+    do_bricks_naive(problem, initial_moves, blueprint)
+}
+
+fn do_bricks_naive(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) -> BrickResult {
+    let _t = crate::stats_timer!("do_bricks_naive").time_it();
     let mut painter = PainterState::new(problem);
-    let mut all_moves = vec![];
 
     for m in initial_moves {
         painter.apply_move(m);
-        all_moves.push(m.clone());
     }
 
     assert_eq!(painter.blocks.len(), 1);
@@ -185,13 +199,12 @@ fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) ->
 
     let Blueprint { mut ys, mut xss } = blueprint;
     loop {
-        let (new_block, moves) = seg_util::isolate_rect(&mut painter, block_id, Shape {
+        let (new_block, _moves) = seg_util::isolate_rect(&mut painter, block_id, Shape {
             x1: 0,
             y1: ys[0],
             x2: problem.target.width,
             y2: *ys.last().unwrap(),
         });
-        all_moves.extend(moves);
         block_id = new_block;
 
         let y1;
@@ -214,13 +227,12 @@ fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) ->
         }
 
         loop {
-            let (new_block, moves) = seg_util::isolate_rect(&mut painter, block_id, Shape {
+            let (new_block, _moves) = seg_util::isolate_rect(&mut painter, block_id, Shape {
                 x1: xs[0],
                 y1: y_min,
                 x2: *xs.last().unwrap(),
                 y2: y_max,
             });
-            all_moves.extend(moves);
             block_id = new_block;
 
             let x1;
@@ -239,7 +251,6 @@ fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) ->
                 &problem.target, &Shape { x1, y1, x2, y2 });
             let m = ColorMove { block_id: block_id.clone(), color };
             painter.apply_move(&m);
-            all_moves.push(m);
             if xs.len() == 1 {
                 break;
             }
@@ -249,18 +260,23 @@ fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) ->
             break;
         }
 
-        let (new_block, moves) = seg_util::merge_all_inside_bb(&mut painter, Shape {
+        let (new_block, _moves) = seg_util::merge_all_inside_bb(&mut painter, Shape {
             x1: 0,
             y1: y_min,
             x2: problem.target.width,
             y2: y_max,
         });
-        all_moves.extend(moves);
         block_id = new_block;
     }
 
     let img = painter.render();
-    let score = painter.cost + image_distance(&problem.target, &img).round() as i64;
+    let dist = image_distance(&problem.target, &img).round() as i64;
+    let score = painter.cost + dist;
 
-    (score, all_moves)
+    BrickResult {
+        score,
+        cost: painter.cost,
+        dist,
+        moves: painter.moves,
+    }
 }
