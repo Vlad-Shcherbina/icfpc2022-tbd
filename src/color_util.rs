@@ -10,6 +10,19 @@ use fxhash::FxHashSet as HashSet;
 use crate::basic::*;
 use crate::image::Image;
 
+crate::entry_point!("dist_benchmark", dist_benchmark, _EP1);
+fn dist_benchmark() {
+    let problem = Problem::load(17);
+    let cf = color_freqs(&problem.target, &problem.shape());
+    climb(&cf, Color::default());
+
+    let start = std::time::Instant::now();
+    for _ in 0..5 {
+        climb(&cf, Color::default());
+    }
+    println!("it took {:?}", start.elapsed());
+}
+
 pub fn color_freqs_distance(colors: &HashMap<Color, f64>, color: Color) -> f64 {
     let mut d = 0f64;
     for (k, v) in colors {
