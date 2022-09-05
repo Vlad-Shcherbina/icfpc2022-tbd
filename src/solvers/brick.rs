@@ -376,24 +376,24 @@ fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) ->
         xs[0] = 0;
         *xs.last_mut().unwrap() = problem.target.width;
 
+        let xs = to_recipe(xs);
+
         let mut merge_cost = 0;
 
+        let mut xx1 = 0;
+        let mut xx2 = problem.width;
         // horizontal cutting
-        loop {
-            let w = *xs.last().unwrap() - xs[0];
-            let cut_left;
+
+        let cnt = xs.len();
+        for (i, sx) in xs.into_iter().enumerate() {
             let x1;
             let x2;
-            if xs[1] - xs[0] < xs[xs.len() - 1] - xs[xs.len() - 2] {
-                cut_left = true;
-                x1 = xs[0];
-                x2 = xs[1];
-                xs.remove(0);
+            if sx > 0 {
+                x1 = xx1;
+                x2 = xx1 + sx;
             } else {
-                cut_left = false;
-                x1 = xs[xs.len() - 2];
-                x2 = xs[xs.len() - 1];
-                xs.pop().unwrap();
+                x1 = xx2 + sx;
+                x2 = xx2;
             }
 
             let cf = crate::color_util::color_freqs(&problem.target, &Shape { x1, y1, x2, y2 });
@@ -402,20 +402,20 @@ fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) ->
 
             let m = ColorMove { block_id: block_id.clone(), color };
             let dc2 = painter.apply_move(&m).cost;
-            let dc = problem.cost(problem.base_costs.color, w * h);
-            assert_eq!(painter.blocks[&block_id].shape.size(), w * h);
+            let dc = problem.cost(problem.base_costs.color, (xx2 - xx1) * h);
+            assert_eq!(painter.blocks[&block_id].shape.size(), (xx2 - xx1) * h);
             assert_eq!(dc, dc2);
             cost += dc;
 
-            if xs.len() == 1 {
+            if i + 1 == cnt {
                 break;
             }
 
-            let dc = problem.cost(problem.base_costs.lcut, w * h);
+            let dc = problem.cost(problem.base_costs.lcut, (xx2 - xx1) * h);
             cost += dc;
-            merge_cost += problem.cost(problem.base_costs.merge, (x2 - x1).max(w - (x2 - x1)) * h);
+            merge_cost += problem.cost(problem.base_costs.merge, (x2 - x1).max(xx2 - xx1 - (x2 - x1)) * h);
 
-            if cut_left {
+            if sx > 0 {
                 let mut res = painter.apply_move(&Move::LCut {
                     block_id,
                     orientation: Orientation::Vertical,
@@ -424,6 +424,7 @@ fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) ->
                 assert_eq!(dc, res.cost);
                 block_id = res.new_block_ids.pop().unwrap();
                 merge_stack.push(res.new_block_ids.pop().unwrap());
+                xx1 += sx;
             } else {
                 let mut res = painter.apply_move(&Move::LCut {
                     block_id,
@@ -433,6 +434,7 @@ fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) ->
                 assert_eq!(dc, res.cost);
                 merge_stack.push(res.new_block_ids.pop().unwrap());
                 block_id = res.new_block_ids.pop().unwrap();
+                xx2 += sx;
             }
         }
 
@@ -440,7 +442,7 @@ fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) ->
             break;
         }
 
-        // horizonal merging
+        // horizontal merging
         while let Some(id) = merge_stack.pop() {
             block_id = painter.apply_move(&Move::Merge {
                 block_id1: block_id,
