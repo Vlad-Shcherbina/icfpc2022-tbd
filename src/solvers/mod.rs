@@ -6,3 +6,4 @@ mod poke;
 mod ga;
 mod spot;
 mod brick;
+mod raster;
