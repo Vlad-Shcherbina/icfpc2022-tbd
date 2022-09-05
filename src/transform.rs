@@ -109,6 +109,14 @@ fn transform_pcut_coords(x: i32, y: i32, t: &Transformation) -> (i32, i32) {
 //    }
 //}
 
+fn tr_id(block_id: &BlockId, block_id_map: &HashMap<BlockId, BlockId>) -> BlockId {
+    if block_id.is_root() {
+        block_id.clone()
+    } else {
+        block_id_map[block_id].clone()
+    }
+}
+
 fn transform_move(m: &Move, t: &Transformation, block_id_map: &mut HashMap<BlockId, BlockId>) -> Move {
     //println!();
     //dbg_print_map(&block_id_map);
@@ -119,7 +127,7 @@ fn transform_move(m: &Move, t: &Transformation, block_id_map: &mut HashMap<Block
             y,
         } => {
             let (x1, y1) = transform_pcut_coords(*x, *y, t);
-            let new_block_id = block_id_map[block_id].clone();
+            let new_block_id = tr_id(block_id, block_id_map);
             match t {
                 Transformation::TransposeXY => {
                     block_id_map.insert(block_id.child(0), new_block_id.child(0));
@@ -145,7 +153,7 @@ fn transform_move(m: &Move, t: &Transformation, block_id_map: &mut HashMap<Block
             orientation,
             line_number,
         } => {
-            let new_block_id = block_id_map[block_id].clone();
+            let new_block_id = tr_id(block_id, block_id_map);
             if orientation == &Orientation::Horizontal && matches!(t, Transformation::FlipY(_)) {
                 block_id_map.insert(block_id.child(0), new_block_id.child(1));
                 block_id_map.insert(block_id.child(1), new_block_id.child(0));
@@ -163,22 +171,22 @@ fn transform_move(m: &Move, t: &Transformation, block_id_map: &mut HashMap<Block
             block_id,
             color,
         } => Move::ColorMove {
-            block_id: block_id_map[block_id].clone(),
+            block_id: tr_id(block_id, block_id_map),
             color: *color,
         },
         Move::Swap {
             block_id1,
             block_id2,
         } => Move::Swap {
-            block_id1: block_id_map[block_id1].clone(),
-            block_id2: block_id_map[block_id2].clone(),
+            block_id1: tr_id(block_id1, block_id_map),
+            block_id2: tr_id(block_id2, block_id_map),
         },
         Move::Merge {
             block_id1,
             block_id2,
         } => Move::Merge {
-            block_id1: block_id_map[block_id1].clone(),
-            block_id2: block_id_map[block_id2].clone(),
+            block_id1: tr_id(block_id1, block_id_map),
+            block_id2: tr_id(block_id2, block_id_map),
         },
     }
 }
@@ -371,72 +379,6 @@ fn transform_regr() {
         color [0.0.0.1.1] [104, 135, 164, 255]
         merge [0.0.0.1.1] [0.0.0.1.0]
         merge [1] [0.0.0.0]
-        merge [2] [0.0.1]
-        merge [3] [0.1]
-        cut [4] [y] [54]
-        color [4.1] [46, 62, 128, 255]
-        cut [4.1] [x] [357]
-        color [4.1.0] [61, 79, 128, 255]
-        cut [4.1.0] [x] [353]
-        color [4.1.0.0] [71, 90, 128, 255]
-        cut [4.1.0.0] [x] [300]
-        color [4.1.0.0.0] [82, 102, 121, 255]
-        cut [4.1.0.0.0] [x] [238]
-        color [4.1.0.0.0.0] [32, 38, 35, 255]
-        cut [4.1.0.0.0.0] [x] [131]
-        color [4.1.0.0.0.0.0] [29, 34, 31, 255]
-        merge [4.1.0.0.0.0.0] [4.1.0.0.0.0.1]
-        merge [5] [4.1.0.0.0.1]
-        merge [6] [4.1.0.0.1]
-        merge [7] [4.1.0.1]
-        merge [8] [4.1.1]
-        cut [9] [y] [103]
-        color [9.1] [27, 34, 29, 255]
-        cut [9.1] [x] [29]
-        color [9.1.1] [29, 33, 30, 255]
-        cut [9.1.1] [x] [50]
-        color [9.1.1.1] [33, 34, 30, 255]
-        cut [9.1.1.1] [x] [71]
-        color [9.1.1.1.1] [28, 31, 28, 255]
-        cut [9.1.1.1.1] [x] [85]
-        color [9.1.1.1.1.1] [31, 35, 32, 255]
-        cut [9.1.1.1.1.1] [x] [135]
-        color [9.1.1.1.1.1.1] [72, 95, 118, 255]
-        cut [9.1.1.1.1.1.1] [x] [163]
-        color [9.1.1.1.1.1.1.1] [95, 125, 154, 255]
-        cut [9.1.1.1.1.1.1.1] [x] [169]
-        color [9.1.1.1.1.1.1.1.1] [48, 65, 135, 255]
-        cut [9.1.1.1.1.1.1.1.1] [x] [347]
-        color [9.1.1.1.1.1.1.1.1.0] [81, 109, 159, 255]
-        cut [9.1.1.1.1.1.1.1.1.0] [x] [297]
-        color [9.1.1.1.1.1.1.1.1.0.0] [92, 125, 160, 255]
-        merge [9.1.1.1.1.1.1.1.1.0.0] [9.1.1.1.1.1.1.1.1.0.1]
-        merge [10] [9.1.1.1.1.1.1.1.1.1]
-        merge [11] [9.1.1.1.1.1.1.1.0]
-        merge [12] [9.1.1.1.1.1.1.0]
-        merge [13] [9.1.1.1.1.1.0]
-        merge [14] [9.1.1.1.1.0]
-        merge [15] [9.1.1.1.0]
-        merge [16] [9.1.1.0]
-        merge [17] [9.1.0]
-        cut [18] [y] [142]
-        color [18.1] [79, 101, 148, 255]
-        cut [18.1] [x] [377]
-        color [18.1.0] [63, 83, 144, 255]
-        cut [18.1.0] [x] [350]
-        color [18.1.0.0] [69, 95, 150, 255]
-        cut [18.1.0.0] [x] [340]
-        color [18.1.0.0.0] [89, 118, 163, 255]
-        cut [18.1.0.0.0] [x] [331]
-        color [18.1.0.0.0.0] [40, 47, 53, 255]
-        cut [18.1.0.0.0.0] [x] [73]
-        color [18.1.0.0.0.0.1] [60, 82, 118, 255]
-        cut [18.1.0.0.0.0.1] [x] [145]
-        color [18.1.0.0.0.0.1.1] [136, 161, 163, 255]
-        cut [18.1.0.0.0.0.1.1] [x] [164]
-        color [18.1.0.0.0.0.1.1.1] [110, 140, 165, 255]
-        cut [18.1.0.0.0.0.1.1.1] [x] [197]
-        color [18.1.0.0.0.0.1.1.1.1] [97, 128, 168, 255]
     ");
 
     let problem = Problem::load(17);
@@ -449,5 +391,5 @@ fn transform_regr() {
     // so far all ok
 
     // TODO: but this crashes
-    // let moves = transform_solution(&moves2, &Transformation::TransposeXY, &problem2.start_blocks);
+    let moves = transform_solution(&moves2, &Transformation::TransposeXY, &problem2.start_blocks);
 }

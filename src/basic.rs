@@ -50,6 +50,9 @@ impl BlockId {
         res.0.push(idx);
         res
     }
+    pub fn is_root(&self) -> bool {
+        self.0.len() == 1
+    }
 
     pub fn parse(s: &str) -> BlockId {
         BlockId(s.split('.').map(|p| p.parse().unwrap()).collect())
