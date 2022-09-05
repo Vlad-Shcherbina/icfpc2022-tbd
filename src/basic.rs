@@ -1,12 +1,12 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
 
+use crate::image::Image;
+use crate::transform::Transformation;
+use crate::util::project_path;
 use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::fmt::{Formatter, Write};
-use crate::image::Image;
-use crate::util::project_path;
-use crate::transform::{Transformation};
 
 #[derive(Clone, Copy, PartialEq, Eq, Default, Hash, PartialOrd, Ord)]
 pub struct Color(pub [u8; 4]);
@@ -94,17 +94,15 @@ pub enum Move {
     },
 }
 
+use crate::basic::PainterStateAction::{
+    AddBlock, ColorBlock, IncrementCost, IncrementNextId, RemoveBlock, SwapBlocks,
+};
 use Move::*;
-use crate::basic::PainterStateAction::{AddBlock, ColorBlock, IncrementCost, IncrementNextId, RemoveBlock, SwapBlocks};
 
 impl std::fmt::Display for Move {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PCut {
-                block_id,
-                x,
-                y,
-            } => write!(f, "cut [{}] [{}, {}]", block_id, x, y),
+            PCut { block_id, x, y } => write!(f, "cut [{}] [{}, {}]", block_id, x, y),
             LCut {
                 block_id,
                 orientation,
@@ -115,11 +113,12 @@ impl std::fmt::Display for Move {
                     Orientation::Vertical => "x",
                 };
                 write!(f, "cut [{}] [{}] [{}]", block_id, o, line_number)
-            },
-            ColorMove {
-                block_id,
-                color,
-            } => write!(f, "color [{}] [{}, {}, {}, {}]", block_id, color.0[0], color.0[1], color.0[2], color.0[3]),  // TODO: use color as Display
+            }
+            ColorMove { block_id, color } => write!(
+                f,
+                "color [{}] [{}, {}, {}, {}]",
+                block_id, color.0[0], color.0[1], color.0[2], color.0[3]
+            ), // TODO: use color as Display
             Swap {
                 block_id1,
                 block_id2,
@@ -161,22 +160,31 @@ impl Move {
                 it.next().unwrap().parse().unwrap(),
             ]);
             assert!(it.next().is_none());
-            return Move::ColorMove {
-                block_id,
-                color,
-            };
+            return Move::ColorMove { block_id, color };
         }
         if let Some(s) = s.strip_prefix("cut") {
             let (block_id, s) = strip_block_id(s);
             if let Some(s) = s.strip_prefix("[x]") {
-                let line_number = s.strip_prefix('[').unwrap().strip_suffix(']').unwrap().parse().unwrap();
+                let line_number = s
+                    .strip_prefix('[')
+                    .unwrap()
+                    .strip_suffix(']')
+                    .unwrap()
+                    .parse()
+                    .unwrap();
                 return Move::LCut {
                     block_id,
                     orientation: Vertical,
                     line_number,
                 };
             } else if let Some(s) = s.strip_prefix("[y]") {
-                let line_number = s.strip_prefix('[').unwrap().strip_suffix(']').unwrap().parse().unwrap();
+                let line_number = s
+                    .strip_prefix('[')
+                    .unwrap()
+                    .strip_suffix(']')
+                    .unwrap()
+                    .parse()
+                    .unwrap();
                 return Move::LCut {
                     block_id,
                     orientation: Horizontal,
@@ -189,11 +197,7 @@ impl Move {
                 let x = it.next().unwrap().parse().unwrap();
                 let y = it.next().unwrap().parse().unwrap();
                 assert!(it.next().is_none());
-                return Move::PCut {
-                    block_id,
-                    x,
-                    y,
-                };
+                return Move::PCut { block_id, x, y };
             }
         }
         if let Some(s) = s.strip_prefix("swap") {
@@ -244,9 +248,19 @@ fn test_string_to_move_and_back() {
 #[test]
 fn test_move_to_string() {
     let moves = vec![
-        Move::ColorMove { block_id: BlockId::root(0), color: Color([146, 149, 120, 223]) },
-        Move::LCut { block_id: BlockId::root(0), orientation: Horizontal, line_number: 160 },
-        Move::ColorMove { block_id: BlockId::root(0).child(1), color: Color([1, 2, 3, 4]) },
+        Move::ColorMove {
+            block_id: BlockId::root(0),
+            color: Color([146, 149, 120, 223]),
+        },
+        Move::LCut {
+            block_id: BlockId::root(0),
+            orientation: Horizontal,
+            line_number: 160,
+        },
+        Move::ColorMove {
+            block_id: BlockId::root(0).child(1),
+            color: Color([1, 2, 3, 4]),
+        },
     ];
 
     let mut res = String::new();
@@ -254,11 +268,14 @@ fn test_move_to_string() {
         writeln!(res, "{}", m).unwrap();
     }
 
-    assert_eq!(res, "\
+    assert_eq!(
+        res,
+        "\
 color [0] [146, 149, 120, 223]
 cut [0] [y] [160]
 color [0.1] [1, 2, 3, 4]
-");
+"
+    );
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -271,13 +288,21 @@ pub struct Shape {
 
 impl std::fmt::Display for Shape {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "shape([{}, {}]x[{}, {}])", self.x1, self.x2, self.y1, self.y2)
+        write!(
+            f,
+            "shape([{}, {}]x[{}, {}])",
+            self.x1, self.x2, self.y1, self.y2
+        )
     }
 }
 
 impl std::fmt::Display for Color {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{}, {}, {}, {}]", self.0[0], self.0[1], self.0[2], self.0[3])
+        write!(
+            f,
+            "[{}, {}, {}, {}]",
+            self.0[0], self.0[1], self.0[2], self.0[3]
+        )
     }
 }
 
@@ -372,7 +397,7 @@ impl Shape {
         let x2 = min(self.x2, other.x2);
         let y2 = min(self.y2, other.y2);
         if x1 < x2 && y1 < y2 {
-            Some(Shape {x1, y1, x2, y2})
+            Some(Shape { x1, y1, x2, y2 })
         } else {
             None
         }
@@ -408,8 +433,8 @@ impl Block {
         assert!(shape.y2 <= self.shape.y2);
         let mut pieces = vec![];
         for p in &self.pieces {
-            if p.0.x2 <= shape.x1 || p.0.x1 >= shape.x2 ||
-               p.0.y2 <= shape.y1 || p.0.y1 >= shape.y2 {
+            if p.0.x2 <= shape.x1 || p.0.x1 >= shape.x2 || p.0.y2 <= shape.y1 || p.0.y1 >= shape.y2
+            {
                 continue;
             }
             let new_shape = Shape {
@@ -420,46 +445,70 @@ impl Block {
             };
             let sub_pic = match &p.1 {
                 Pic::Unicolor(c) => Pic::Unicolor(*c),
-                Pic::Bitmap(s) => {
-                    Pic::Bitmap(Shape {
-                        x1: s.x1 + new_shape.x1 - p.0.x1,
-                        y1: s.y1 + new_shape.y1 - p.0.y1,
-                        x2: s.x2 + new_shape.x2 - p.0.x2,
-                        y2: s.y2 + new_shape.y2 - p.0.y2,
-                    })
-                }
+                Pic::Bitmap(s) => Pic::Bitmap(Shape {
+                    x1: s.x1 + new_shape.x1 - p.0.x1,
+                    y1: s.y1 + new_shape.y1 - p.0.y1,
+                    x2: s.x2 + new_shape.x2 - p.0.x2,
+                    y2: s.y2 + new_shape.y2 - p.0.y2,
+                }),
             };
             pieces.push((new_shape, sub_pic));
         }
-        Block {
-            shape,
-            pieces,
-        }
+        Block { shape, pieces }
     }
 }
 
 #[cfg(test)]
 #[test]
 fn test_sub_block() {
-    let shape = Shape {x1: 10, y1: 110, x2: 20, y2: 120};
-    let shape2 = Shape {x1: 11, y1: 111, x2: 13, y2: 113};
+    let shape = Shape {
+        x1: 10,
+        y1: 110,
+        x2: 20,
+        y2: 120,
+    };
+    let shape2 = Shape {
+        x1: 11,
+        y1: 111,
+        x2: 13,
+        y2: 113,
+    };
     let c = Color([1, 2, 3, 4]);
     let block = Block {
         shape: shape,
         pieces: vec![(shape.clone(), Pic::Unicolor(c))],
     };
     let subblock = block.sub_block(shape2.clone());
-    assert!(subblock == Block {shape: shape2.clone(), pieces: vec![(shape2.clone(), Pic::Unicolor(c))]})
+    assert!(
+        subblock
+            == Block {
+                shape: shape2.clone(),
+                pieces: vec![(shape2.clone(), Pic::Unicolor(c))]
+            }
+    )
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum PainterStateAction {
-    RemoveBlock { block_id: BlockId, removed_value: Block },
-    AddBlock { block_id: BlockId },
+    RemoveBlock {
+        block_id: BlockId,
+        removed_value: Block,
+    },
+    AddBlock {
+        block_id: BlockId,
+    },
     IncrementNextId,
-    IncrementCost { added_cost: i64 },
-    ColorBlock { block_id: BlockId, old_block: Block },
-    SwapBlocks { block_id1: BlockId, block_id2: BlockId },
+    IncrementCost {
+        added_cost: i64,
+    },
+    ColorBlock {
+        block_id: BlockId,
+        old_block: Block,
+    },
+    SwapBlocks {
+        block_id1: BlockId,
+        block_id2: BlockId,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -481,13 +530,13 @@ pub struct PainterState<'a> {
     pub blocks: HashMap<BlockId, Block>,
     pub(crate) cost: i64,
     history: Vec<Vec<PainterStateAction>>,
-    snapshot: Option<usize>,  // target `history` size
+    snapshot: Option<usize>, // target `history` size
     pub moves: Vec<Move>,
 }
 
 pub struct ApplyMoveResult {
     pub cost: i64,
-    pub new_block_ids: Vec<BlockId>,  // new block IDs for "cut" and "merge" moves
+    pub new_block_ids: Vec<BlockId>, // new block IDs for "cut" and "merge" moves
 }
 
 impl<'a> PainterState<'a> {
@@ -515,7 +564,10 @@ impl<'a> PainterState<'a> {
         let mut last_move_actions = self.history.pop().unwrap();
         while let Some(action) = last_move_actions.pop() {
             match action {
-                PainterStateAction::RemoveBlock { block_id, removed_value } => {
+                PainterStateAction::RemoveBlock {
+                    block_id,
+                    removed_value,
+                } => {
                     self.blocks.insert(block_id, removed_value);
                 }
                 PainterStateAction::AddBlock { block_id } => {
@@ -527,10 +579,16 @@ impl<'a> PainterState<'a> {
                 PainterStateAction::IncrementCost { added_cost } => {
                     self.cost -= added_cost;
                 }
-                ColorBlock { block_id, old_block } => {
+                ColorBlock {
+                    block_id,
+                    old_block,
+                } => {
                     self.blocks.insert(block_id, old_block);
                 }
-                SwapBlocks { block_id1, block_id2 } => {
+                SwapBlocks {
+                    block_id1,
+                    block_id2,
+                } => {
                     let mut block1 = self.blocks.remove(&block_id1).unwrap();
                     let mut block2 = self.blocks.remove(&block_id2).unwrap();
                     swap_blocks(&mut block1, &mut block2);
@@ -538,7 +596,7 @@ impl<'a> PainterState<'a> {
                     self.blocks.insert(block_id2.clone(), block2);
                 }
             }
-        };
+        }
         self.moves.pop();
     }
 
@@ -551,24 +609,43 @@ impl<'a> PainterState<'a> {
         match m {
             PCut { block_id, x, y } => {
                 let block = self.blocks.remove(block_id).unwrap();
-                actions.push(RemoveBlock { block_id: block_id.clone(), removed_value: block.clone() });
+                actions.push(RemoveBlock {
+                    block_id: block_id.clone(),
+                    removed_value: block.clone(),
+                });
                 for (i, ss) in block.shape.p_cut_subshapes(*x, *y).into_iter().enumerate() {
                     let new_block = block.sub_block(ss);
                     let new_block_id = block_id.child(i);
-                    actions.push(AddBlock {block_id: new_block_id.clone()});
+                    actions.push(AddBlock {
+                        block_id: new_block_id.clone(),
+                    });
                     new_block_ids.push(new_block_id.clone());
                     self.blocks.insert(new_block_id, new_block);
                 }
                 base_cost = self.base_costs.pcut;
                 block_size = block.shape.size();
             }
-            LCut { block_id, orientation, line_number } => {
+            LCut {
+                block_id,
+                orientation,
+                line_number,
+            } => {
                 let block = self.blocks.remove(block_id).unwrap();
-                actions.push(RemoveBlock { block_id: block_id.clone(), removed_value: block.clone() });
-                for (i, ss) in block.shape.l_cut_subshapes(*orientation, *line_number).into_iter().enumerate() {
+                actions.push(RemoveBlock {
+                    block_id: block_id.clone(),
+                    removed_value: block.clone(),
+                });
+                for (i, ss) in block
+                    .shape
+                    .l_cut_subshapes(*orientation, *line_number)
+                    .into_iter()
+                    .enumerate()
+                {
                     let new_block = block.sub_block(ss);
                     let new_block_id = block_id.child(i);
-                    actions.push(AddBlock {block_id: new_block_id.clone()});
+                    actions.push(AddBlock {
+                        block_id: new_block_id.clone(),
+                    });
                     new_block_ids.push(new_block_id.clone());
                     self.blocks.insert(new_block_id, new_block);
                 }
@@ -577,12 +654,18 @@ impl<'a> PainterState<'a> {
             }
             Move::ColorMove { block_id, color } => {
                 let block = self.blocks.get_mut(block_id).unwrap();
-                actions.push(ColorBlock { block_id: block_id.clone(), old_block: block.clone() });
+                actions.push(ColorBlock {
+                    block_id: block_id.clone(),
+                    old_block: block.clone(),
+                });
                 block.pieces = vec![(block.shape, Pic::Unicolor(*color))];
                 base_cost = self.base_costs.color;
                 block_size = block.shape.size();
             }
-            Swap { block_id1, block_id2 } => {
+            Swap {
+                block_id1,
+                block_id2,
+            } => {
                 let mut block1 = self.blocks.remove(block_id1).unwrap();
                 let mut block2 = self.blocks.remove(block_id2).unwrap();
                 swap_blocks(&mut block1, &mut block2);
@@ -590,16 +673,32 @@ impl<'a> PainterState<'a> {
                 block_size = block1.shape.size();
                 self.blocks.insert(block_id1.clone(), block1);
                 self.blocks.insert(block_id2.clone(), block2);
-                actions.push(SwapBlocks { block_id1: block_id1.clone(), block_id2: block_id2.clone() })
+                actions.push(SwapBlocks {
+                    block_id1: block_id1.clone(),
+                    block_id2: block_id2.clone(),
+                })
             }
-            Merge { block_id1, block_id2 } => {
+            Merge {
+                block_id1,
+                block_id2,
+            } => {
                 let block1 = self.blocks.remove(block_id1).unwrap();
                 let block2 = self.blocks.remove(block_id2).unwrap();
-                actions.push(RemoveBlock { block_id: block_id1.clone(), removed_value: block1.clone() });
-                actions.push(RemoveBlock { block_id: block_id2.clone(), removed_value: block2.clone() });
+                actions.push(RemoveBlock {
+                    block_id: block_id1.clone(),
+                    removed_value: block1.clone(),
+                });
+                actions.push(RemoveBlock {
+                    block_id: block_id2.clone(),
+                    removed_value: block2.clone(),
+                });
                 let mut new_block = Block {
-                    shape: merge_shapes(block1.shape, block2.shape).unwrap_or_else(||
-                        panic!("merging blocks that are not adjacent {:?} {:?} (in move {})", block1.shape, block2.shape, m)),
+                    shape: merge_shapes(block1.shape, block2.shape).unwrap_or_else(|| {
+                        panic!(
+                            "merging blocks that are not adjacent {:?} {:?} (in move {})",
+                            block1.shape, block2.shape, m
+                        )
+                    }),
                     pieces: block1.pieces,
                 };
                 new_block.pieces.extend(block2.pieces);
@@ -609,15 +708,20 @@ impl<'a> PainterState<'a> {
 
                 let new_block_id = BlockId::root(self.next_id);
                 new_block_ids.push(new_block_id.clone());
-                actions.push(AddBlock { block_id: new_block_id.clone()});
+                actions.push(AddBlock {
+                    block_id: new_block_id.clone(),
+                });
                 actions.push(IncrementNextId);
                 self.blocks.insert(new_block_id, new_block);
                 self.next_id += 1;
             }
         }
-        let extra_cost = ((base_cost * self.width * self.height + (block_size + 1)/2) / block_size) as i64;
+        let extra_cost =
+            ((base_cost * self.width * self.height + (block_size + 1) / 2) / block_size) as i64;
         self.cost += extra_cost;
-        actions.push(IncrementCost { added_cost: extra_cost });
+        actions.push(IncrementCost {
+            added_cost: extra_cost,
+        });
         self.history.push(actions);
         self.moves.push(m.clone());
         ApplyMoveResult {
@@ -750,7 +854,8 @@ pub fn image_slices_distance(img1: &Image, img2: &Image, shape1: Shape, shape2: 
     let mut res = 0.0f64;
     for dy in 0..shape1.height() {
         for dx in 0..shape1.width() {
-            res += img1.get_pixel(shape1.x1 + dx, shape1.y1 + dy)
+            res += img1
+                .get_pixel(shape1.x1 + dx, shape1.y1 + dy)
                 .dist(&img2.get_pixel(shape2.x1 + dx, shape2.y1 + dy));
         }
     }
@@ -765,19 +870,26 @@ pub fn image_slice_distance(img1: &Image, img2: &Image, shape: Shape) -> f64 {
 pub fn image_distance(img1: &Image, img2: &Image) -> f64 {
     assert_eq!(img1.width, img2.width);
     assert_eq!(img1.height, img2.height);
-    image_slice_distance(img1, img2, Shape { x1: 0, y1: 0, x2: img1.width, y2: img1.height })
+    image_slice_distance(
+        img1,
+        img2,
+        Shape {
+            x1: 0,
+            y1: 0,
+            x2: img1.width,
+            y2: img1.height,
+        },
+    )
 }
 
-#[derive(serde::Deserialize)]
-#[derive(Debug)]
+#[derive(serde::Deserialize, Debug)]
 struct InitialCanvas {
     width: i32,
     height: i32,
     blocks: Vec<InitialBlock>,
 }
 
-#[derive(serde::Deserialize)]
-#[derive(Debug)]
+#[derive(serde::Deserialize, Debug)]
 struct InitialBlock {
     #[serde(rename = "blockId")]
     block_id: String,
@@ -793,6 +905,7 @@ struct InitialBlock {
 
 #[derive(Clone)]
 pub struct Problem {
+    pub id: Option<i32>,
     pub width: i32,
     pub height: i32,
     pub initial_img: Option<Image>,
@@ -808,9 +921,10 @@ impl Problem {
 
         let mut start_blocks: Vec<(BlockId, Block)> = vec![];
 
-        let source_img_path = project_path(format!("data/problems/{}.source.png", problem_id));
-        let initial_img = if source_img_path.exists() {
-            Some(Image::load(&source_img_path))
+        //let source_img_path = project_path(format!("data/problems/{}.source.png", problem_id));
+        let initial_img_path = project_path(format!("data/problems/{}.initial.png", problem_id));
+        let initial_img = if initial_img_path.exists() {
+            Some(Image::load(&initial_img_path))
         } else {
             None
         };
@@ -838,17 +952,28 @@ impl Problem {
                     assert_eq!(shape.y1, y1);
                     Pic::Bitmap(shape)
                 };
-                start_blocks.push((block_id, Block {
-                    shape,
-                    pieces: vec![(shape, pic)],
-                }));
+                start_blocks.push((
+                    block_id,
+                    Block {
+                        shape,
+                        pieces: vec![(shape, pic)],
+                    },
+                ));
             }
         } else {
-            let shape = Shape { x1: 0, y1: 0, x2: target.width, y2: target.height };
-            start_blocks.push((BlockId::root(0), Block {
-                shape,
-                pieces: vec![(shape, Pic::Unicolor(Color([255, 255, 255, 255])))],
-            }));
+            let shape = Shape {
+                x1: 0,
+                y1: 0,
+                x2: target.width,
+                y2: target.height,
+            };
+            start_blocks.push((
+                BlockId::root(0),
+                Block {
+                    shape,
+                    pieces: vec![(shape, Pic::Unicolor(Color([255, 255, 255, 255])))],
+                },
+            ));
         }
 
         let base_costs = if problem_id >= 36 {
@@ -870,17 +995,23 @@ impl Problem {
         };
 
         Problem {
+            id: Some(problem_id),
             base_costs,
             width: target.width,
             height: target.height,
             target,
-            initial_img,  // TODO
+            initial_img, // TODO
             start_blocks,
         }
     }
 
     pub fn shape(&self) -> Shape {
-        Shape { x1: 0, y1: 0, x2: self.width, y2: self.height }
+        Shape {
+            x1: 0,
+            y1: 0,
+            x2: self.width,
+            y2: self.height,
+        }
     }
 
     pub fn transform(&self, t: &Transformation) -> Problem {
@@ -893,6 +1024,7 @@ impl Problem {
             new_start_blocks.push((block_id.clone(), block.transform(t)));
         }
         Problem {
+            id: None,
             width: new_width,
             height: new_height,
             target: new_target,
@@ -917,9 +1049,12 @@ fn render_moves_example() {
         PCut {
             block_id: BlockId::root(0),
             x: 200,
-            y: 200
+            y: 200,
         },
-        Swap { block_id1: BlockId::root(0).child(0), block_id2: BlockId::root(0).child(1) },
+        Swap {
+            block_id1: BlockId::root(0).child(0),
+            block_id2: BlockId::root(0).child(1),
+        },
         /*Move::ColorMove {
             block_id: BlockId::root(0).child(3),
             color: Color([128, 128, 128, 255]),
@@ -955,7 +1090,10 @@ fn test_split_merge() {
         orientation: Orientation::Horizontal,
         line_number: 50,
     });
-    painter.apply_move(&Merge { block_id1: BlockId::root(0).child(0), block_id2: BlockId::root(0).child(1) });
+    painter.apply_move(&Merge {
+        block_id1: BlockId::root(0).child(0),
+        block_id2: BlockId::root(0).child(1),
+    });
 }
 
 #[cfg(test)]
@@ -974,8 +1112,13 @@ fn test_rollback() {
     // painter.apply_move(&Merge { block_id1: BlockId::root(0).child(0), block_id2: BlockId::root(0).child(1) });
 }
 
-
-fn check_score(problem_id: i32, sol: &str, expected_cost: i64, expected_dist: i64, total_score: i64) {
+fn check_score(
+    problem_id: i32,
+    sol: &str,
+    expected_cost: i64,
+    expected_dist: i64,
+    total_score: i64,
+) {
     eprintln!("---");
     dbg!(problem_id);
 
@@ -1002,14 +1145,26 @@ fn test_score_calculation() {
     // initial canvas with a bitmap
     check_score(36, "", 0, 71523, 71523);
     check_score(36, "cut [0] [120, 170]", 3, 71523, 71526);
-    check_score(36, "
+    check_score(
+        36,
+        "
         cut [0] [200, 200]
         swap [0.0] [0.1]
-    ", 15, 83031, 83046);
-    check_score(36, "
+    ",
+        15,
+        83031,
+        83046,
+    );
+    check_score(
+        36,
+        "
         cut [0] [200, 200]
         merge [0.0] [0.1]
-    ", 7, 71523, 71530);
+    ",
+        7,
+        71523,
+        71530,
+    );
     check_score(36, "cut [0] [x] [70]", 2, 71523, 71525);
     check_score(36, "color [0] [123, 22, 71, 55]", 5, 192218, 192223);
 
@@ -1019,24 +1174,38 @@ fn test_score_calculation() {
     check_score(1, "color [0] [20, 50, 60, 90]", 5, 217215, 217220);
 
     // merge
-    check_score(1, "
+    check_score(
+        1,
+        "
         color [0] [20, 50, 60, 90]
         cut [0] [x] [100]
         merge [0.0] [0.1]
-    ", 13, 217215, 217228);
+    ",
+        13,
+        217215,
+        217228,
+    );
 
     // merge
-    check_score(1, "
+    check_score(
+        1,
+        "
         color [0] [20, 50, 60, 90]
         cut [0] [200, 200]
         merge [0.0] [0.1]
-    ", 19, 217215, 217234);
+    ",
+        19,
+        217215,
+        217234,
+    );
 
     // initial color
     check_score(1, "", 0, 194616, 194616);
 
     // Arsenij's manual solution
-    check_score(1, "
+    check_score(
+        1,
+        "
         color [0] [255, 255, 255, 255]
         cut [0] [320, 80]
         cut [0.2] [x] [360]
@@ -1102,5 +1271,9 @@ fn test_score_calculation() {
         swap [0.2.0.0.0.0] [0.0.1.1.1.0]
         swap [0.2.0.1.0.0] [0.0.1.0.1.0]
         swap [0.2.0.0.1.0] [0.0.1.1.0.0]
-    ", 14423, 20618, 35041);
+    ",
+        14423,
+        20618,
+        35041,
+    );
 }

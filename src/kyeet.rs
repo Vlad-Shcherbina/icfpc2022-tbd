@@ -35,6 +35,7 @@ fn kyeet() {
             170.0, 180.0, 190.0, 200.0, 210.0, 220.0, 230.0, 240.0, 250.0, 260.0, 270.0, 280.0,
             290.0, 300.0, 400.0,
         ] {
+            // for dt in [220.0] {
             // let dt = 250.0;
             let res = kyeet_do(&KyeetArgs { dt }, &problem);
             res.save(Path::new(&format!(
@@ -45,54 +46,65 @@ fn kyeet() {
     }
 }
 
-struct KyeetArgs {
+pub struct KyeetArgs {
     dt: f64,
 }
 
-fn kyeet_do(args: &KyeetArgs, problem: &Problem) -> Image {
-    let scrape_colors_from: Image = problem
-        .clone()
-        .initial_img
-        .unwrap_or_else(|| problem.target.clone());
+// pub fn portrait_of_initial_image_as_a_young_target_image(
+//     args: &KyeetArgs,
+//     problem: &Problem,
+// ) -> Vec<Color> {
+//     kyeet_do(args, problem)
+//     vec![]
+// }
 
-    let cfs = color_freqs(
-        &scrape_colors_from,
-        &Shape {
-            x1: 0,
-            y1: 0,
-            x2: scrape_colors_from.width,
-            y2: scrape_colors_from.height,
+/*
+
+initial_colors = [...]
+target_colors = [...]
+
+if target_colors.len >= initial_colors.len {
+    for c in initial_colors {
+        target_colors.min_by_key(|x| c.dist(x)) -> c
+    }
+} else ???
+
+TARGET PALETTE: 0 2 3 10
+INITIAL PALETTE: 0 3.5 4 12
+RES: 0 2 4 12
+NORM: 0 4 3.5 12
+
+=== PROBLEMATIC: ===
+TARGET PALETTE: 0 1 2
+INITIAL PALETTE: 0 1
+SHOULDBE: 0 1 2 (id)
+RES: 0 1 1
+:(
+
+*/
+
+pub fn kyeet_do(args: &KyeetArgs, problem: &Problem) -> Image {
+    let beep = squeeze_color_range(args, problem);
+    let res_palette = match beep.len() {
+        2 => match problem.id {
+            Some(n) => {
+                if n > 25 && n < 36 {
+                    eprintln!("!!!!");
+                    let arm1 =
+                        tweak_target_palette_for_26_35(beep.get(1).unwrap(), beep.first().unwrap());
+                    arm1
+                } else {
+                    let arm2 = beep.get(1).unwrap().clone();
+                    arm2
+                }
+            }
+            None => {
+                let arm3 = beep.get(1).unwrap().clone();
+                arm3
+            }
         },
-    );
-
-    let mut centered: HashMap<Color, f64> = HashMap::default();
-    let mut cfs1 = cfs;
-    // let mut cfs1_ptr = &cfs1;
-    // let mut i = 0;
-    // eprintln!("! ({}) !", cfs1.len());
-    while !cfs1.is_empty() {
-        // eprintln!("! ({}) !", cfs1.len());
-        // i += 1;
-        // if i % 100 == 0 {
-        // eprint!("({})", cfs1.len());
-        // }
-        let (tube, cfs2) = squeeze_once(args.dt, &cfs1, false);
-        // cfs1.retain(|_, _| false);
-        // for c2 in cfs2 {
-        //     cfs1.insert(c2.0, c2.1);
-        // }
-        cfs1 = cfs2;
-        centered.insert(tube.0, tube.1);
-    }
-
-    let colors = centered.keys();
-    let mut colors_vec = vec![];
-
-    for ccc in colors {
-        colors_vec.push(ccc.clone());
-    }
-
-    // dbg!("Yoba {}", colors.clone());
+        _otherwise => beep.first().unwrap().clone(),
+    };
 
     let mut res = problem.target.clone();
 
@@ -100,13 +112,88 @@ fn kyeet_do(args: &KyeetArgs, problem: &Problem) -> Image {
         for iy in 0..problem.target.height {
             let c = problem.target.get_pixel(ix, iy);
             // TODO: consider weights?!
-            res.set_pixel(ix, iy, closest_color_from_colors(&c, &colors_vec));
+            res.set_pixel(ix, iy, closest_color_from_colors(&c, &res_palette).1);
         }
     }
 
-    // Image::new(1, 1, Color([255, 255, 255, 255]))
-
     res
+}
+
+pub fn tweak_target_palette_for_26_35(
+    target_palette: &Vec<Color>,
+    initial_palette: &Vec<Color>,
+) -> Vec<Color> {
+    // eprintln!("=======================================");
+    let mut tp1 = target_palette.clone();
+    dbg!(target_palette.clone());
+    dbg!(initial_palette.clone());
+    for ic in initial_palette {
+        let (_d, c) = closest_color_from_colors(ic, target_palette);
+        let mut tp2: Vec<Color> = vec![];
+        for x in tp1.clone() {
+            if initial_palette.contains(&x) {
+                // eprintln!("<><><><><><> hoyo <>< ><><><><><><><><><>` {:?}", x);
+                continue;
+            }
+            if x == c {
+                // eprintln!("|||||||||||| KAPPA ||||||||||| {:?}", x);
+                tp2.push(*ic);
+            } else {
+                // eprintln!("=-=-=-=-=- DELTA -=-=-=-=-= {:?}", x);
+                tp2.push(x);
+            }
+        }
+        tp1 = tp2.clone();
+        // eprintln!("=== yoyoba ===");
+    }
+    dbg!(tp1.clone());
+    tp1
+}
+
+pub fn squeeze_color_range(args: &KyeetArgs, problem: &Problem) -> Vec<Vec<Color>> {
+    // let scrape_colors_from: Image = problem
+    //     .clone()
+    //     .initial_img
+    //     .unwrap_or_else(|| problem.target.clone());
+
+    let scrapes = match problem.clone().initial_img {
+        None => vec![problem.target.clone()],
+        Some(x) => vec![x, problem.target.clone()],
+    };
+
+    // let scrape_colors_from: Image = problem.clone().initial_img.unwrap();
+    // TODO: we can remember the frequencies of each colour!!!
+    scrapes
+        .iter()
+        .map(|scrape_colors_from| {
+            let cfs = color_freqs(
+                scrape_colors_from,
+                &Shape {
+                    x1: 0,
+                    y1: 0,
+                    x2: scrape_colors_from.width,
+                    y2: scrape_colors_from.height,
+                },
+            );
+
+            let mut centered: HashMap<Color, f64> = HashMap::default();
+            let mut cfs1 = cfs;
+            while !cfs1.is_empty() {
+                let (tube, cfs2) = squeeze_once(args.dt, &cfs1, false);
+                cfs1 = cfs2;
+                centered.insert(tube.0, tube.1);
+            }
+
+            let colors = centered.keys();
+            let mut colors_vec = vec![];
+
+            for ccc in colors {
+                colors_vec.push(*ccc);
+            }
+
+            colors_vec.clone()
+        })
+        .collect()
 }
 
 fn index_cfs(cfs: HashMap<Color, f64>) -> (Vec<(f64, Color)>, Vec<Color>) {
