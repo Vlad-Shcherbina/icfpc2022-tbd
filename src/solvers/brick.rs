@@ -11,13 +11,21 @@ use crate::invocation::{record_this_invocation, Status};
 use crate::uploader::upload_solution;
 use crate::color_util::*;
 use crate::seg_util;
+use crate::transform::Transformation::TransposeXY;
+use crate::transform::transform_solution;
 
 use crate::basic::Move::*;
 
 struct Shared {
     client: postgres::Client,
     best_scores: BTreeMap<i32, i64>,
-    improvements: HashMap<i32, Vec<Move>>,
+    improvements: HashMap<i32, (SolverArgs, Vec<Move>)>,
+}
+
+#[derive(serde::Serialize)]
+#[derive(Clone)]
+struct SolverArgs {
+    transposed: bool,
 }
 
 crate::entry_point!("brick_solver", brick_solver);
@@ -41,9 +49,10 @@ fn brick_solver() {
     }
     eprintln!("{:?}", best_scores);
     let local_best_scores: BTreeMap<i32, AtomicI64> = problem_range.clone().map(|i| (i, AtomicI64::new(i64::MAX))).collect();
-    let improvements: HashMap<i32, Vec<Move>> = HashMap::new();
     let shared = Shared {
-        client, best_scores, improvements,
+        client,
+        best_scores,
+        improvements: HashMap::new(),
     };
     let shared = Mutex::new(shared);
 
@@ -58,11 +67,11 @@ fn brick_solver() {
                 let mut tx = shared.client.transaction().unwrap();
                 let incovation_id = record_this_invocation(&mut tx, Status::KeepRunning { seconds: 65.0 });
                 if !shared.improvements.is_empty() {
-                    for (problem_id, moves) in shared.improvements.drain() {
+                    for (problem_id, (solver_args, moves)) in shared.improvements.drain() {
                         if dry_run {
                             eprintln!("dry run: pretend submit improvement for problem {}", problem_id);
                         } else {
-                            upload_solution(&mut tx, problem_id, &moves, "brick", &serde_json::Value::Null, incovation_id);
+                            upload_solution(&mut tx, problem_id, &moves, "brick", &serde_json::to_value(&solver_args).unwrap(), incovation_id);
                         }
                     }
                 }
@@ -80,10 +89,16 @@ fn brick_solver() {
         });
 
         for problem_id in problem_range {
+            let transposed = false;
+
             let local_best_score = &local_best_scores[&problem_id];
             let shared = &shared;
             scope.spawn(move || {
-                let problem = Problem::load(problem_id);
+                let mut problem = Problem::load(problem_id);
+                if transposed {
+                    problem = problem.transform(&TransposeXY);
+                }
+
                 let mut painter = PainterState::new(&problem);
                 let (_, initial_moves) = seg_util::merge_all(&mut painter);
                 let mut best_blueprint = Blueprint::random();
@@ -105,8 +120,20 @@ fn brick_solver() {
                         let best_score = shared.best_scores.get_mut(&problem_id).unwrap();
                         if br.score < *best_score {
                             eprintln!("new best score for problem {}: {} -> {}", problem_id, *best_score, br.score);
+                            let mut moves = br.moves;
+                            if transposed {
+                                eprintln!("----");
+                                for m in &moves {
+                                    eprintln!("{}", m);
+                                }
+                                eprintln!("----");
+                                moves = transform_solution(&moves, &TransposeXY, &problem.start_blocks);
+                            }
                             *best_score = br.score;
-                            shared.improvements.insert(problem_id, br.moves);
+                            let a = SolverArgs {
+                                transposed: false,
+                            };
+                            shared.improvements.insert(problem_id, (a, moves));
                         }
                     }
                 }
