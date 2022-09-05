@@ -1,6 +1,7 @@
 use postgres::Client;
 use serde::Deserialize;
 
+use crate::invocation::{record_this_invocation, Status};
 use crate::util::DateTime;
 use crate::uploader::{best_solution, get_solution};
 
@@ -148,6 +149,11 @@ fn api_demo() {
 crate::entry_point!("submit_all_best_solutions", submit_all_best_solutions, _EP2);
 fn submit_all_best_solutions() {
     let mut client = crate::db::create_client();
+
+    let mut tx = client.transaction().unwrap();
+    record_this_invocation(&mut tx, Status::Stopped);
+    tx.commit().unwrap();
+
     for problem_id in 1..=40 {
         submit_best_solution(&mut client, problem_id);
         eprintln!("submitted best solution for problem {}", problem_id);
