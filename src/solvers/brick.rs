@@ -127,7 +127,7 @@ fn brick_solver() {
                                     eprintln!("{}", m);
                                 }
                                 eprintln!("----");
-                                moves = transform_solution(&moves, &TransposeXY, &problem.start_blocks);
+                                moves = transform_solution(&moves, &TransposeXY);
                             }
                             *best_score = br.score;
                             let a = SolverArgs {

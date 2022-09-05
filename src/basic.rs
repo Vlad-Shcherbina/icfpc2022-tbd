@@ -913,7 +913,7 @@ pub struct Problem {
     pub height: i32,
     pub initial_img: Option<Image>,
     pub target: Image,
-    pub start_blocks: Vec<(BlockId, Block)>,
+    start_blocks: Vec<(BlockId, Block)>,
     base_costs: BaseCosts,
 }
 
