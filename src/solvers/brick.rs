@@ -114,7 +114,11 @@ fn brick_solver() {
                             Blueprint::random()
                         };
 
+                        // let (dp_score, _) = dp(&problem, blueprint.ys.clone(), &mut wcache);
+
                         let mut sbr = simulate_bricks(&problem, blueprint.clone(), &mut wcache);
+                        // eprintln!("{} {}", sbr.score(), dp_score);
+
                         sbr.cost += initial_cost;
                         if thread_rng().gen_bool(0.01) {
                             let br = do_bricks(&problem, &initial_moves, blueprint.clone());
@@ -236,6 +240,98 @@ fn to_recipe(mut xs: Vec<i32>) -> Vec<i32> {
 struct SimulateBrickResult {
     dist: i64,
     cost: i64,
+}
+
+fn dp(problem: &Problem, mut ys: Vec<i32>, wcache: &mut WCache) -> (f64, Vec<Vec<i32>>) {
+    let _t = crate::stats_timer!("dp").time_it();
+    let mut score = 0.0;
+    ys[0] = 0;
+    *ys.last_mut().unwrap() = problem.target.height;
+
+    let mut xss = vec![];
+
+    let ys = to_recipe(ys);
+
+    let mut yy1 = 0;
+    let mut yy2 = problem.height;
+    for (i, &sy) in ys.iter().enumerate() {
+        let y1;
+        let y2;
+        if sy > 0 {
+            y1 = yy1;
+            y2 = yy1 + sy;
+        } else {
+            y2 = yy2;
+            y1 = yy2 + sy;
+        }
+
+        let last = i + 1 == ys.len();
+        let (row_score, xs) = row_dp(problem, y1, y2, yy2 - yy1, !last, wcache);
+        xss.push(xs);
+        score += row_score;
+
+        score += problem.cost(problem.base_costs.lcut, problem.width * (yy2 - yy1)) as f64;
+
+        if sy > 0 {
+            yy1 += sy;
+        } else {
+            yy2 += sy;
+        }
+    }
+
+    (score, xss)
+}
+
+fn row_dp(problem: &Problem, y1: i32, y2: i32, h: i32, merge: bool, wcache: &mut WCache) -> (f64, Vec<i32>) {
+    let _t = crate::stats_timer!("row_dp").time_it();
+    let mut best: HashMap<(i32, i32), (f64, Vec<i32>)> = HashMap::default();
+    for w in 1..=problem.width {
+        dbg!(w);
+        for x1 in 0..=problem.width - w {
+            let x2 = x1 + w;
+            let mut best_score =
+                wcache.get_dist(Shape {x1, y1, x2, y2}, problem) * 0.005 +
+                problem.cost(problem.base_costs.color, (x2 - x1) * h) as f64;
+            let mut best_sol = vec![x2 - x1];
+
+            let color_and_cut_cost =
+                problem.cost(problem.base_costs.color, (x2 - x1) * h) as f64 +
+                problem.cost(problem.base_costs.lcut, (x2 - x1) * h) as f64;
+            for x in x1 + 1 .. x2 {
+                let merge_cost = if merge {
+                    problem.cost(problem.base_costs.merge, h * (x - x1).max(x2 - x)) as f64
+                } else {
+                    0.0
+                };
+
+                let (score1, sol1) = &best[&(x1, x)];
+                let score =
+                    wcache.get_dist(Shape {x1, y1, x2: x, y2}, problem) * 0.005 +
+                    color_and_cut_cost + merge_cost +
+                    score1;
+                if score < best_score {
+                    best_score = score;
+                    best_sol = sol1.clone();
+                    best_sol.push(x - x1);
+                }
+
+                let (score2, sol2) = &best[&(x, x2)];
+                let score =
+                    wcache.get_dist(Shape {x1: x, y1, x2, y2}, problem) * 0.005 +
+                    color_and_cut_cost + merge_cost +
+                    score2;
+                if score < best_score {
+                    best_score = score;
+                    best_sol = sol2.clone();
+                    best_sol.push(x - x2);
+                }
+            }
+            let old = best.insert((x1, x2), (best_score, best_sol));
+            assert!(old.is_none());
+        }
+    }
+
+    best.remove(&(0, problem.width)).unwrap()
 }
 
 impl SimulateBrickResult {
