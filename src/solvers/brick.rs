@@ -103,6 +103,7 @@ fn brick_solver() {
 
                     let mut painter = PainterState::new(&problem);
                     let (_, initial_moves) = seg_util::merge_all(&mut painter);
+                    let initial_cost = painter.cost;
                     let mut best_blueprint = Blueprint::random();
                     loop {
                         let blueprint = if thread_rng().gen_bool(0.5) {
@@ -113,7 +114,8 @@ fn brick_solver() {
                             Blueprint::random()
                         };
 
-                        let sbr = simulate_bricks(&problem, &initial_moves, blueprint.clone(), &mut wcache);
+                        let mut sbr = simulate_bricks(&problem, blueprint.clone(), &mut wcache);
+                        sbr.cost += initial_cost;
                         if thread_rng().gen_bool(0.01) {
                             let br = do_bricks(&problem, &initial_moves, blueprint.clone());
                             assert_eq!(sbr.cost, br.cost);
@@ -121,9 +123,9 @@ fn brick_solver() {
                         }
 
                         // eprintln!("{} {}", problem_id, score);
-                        if sbr.score < local_best_score.load(SeqCst) {
-                            local_best_score.store(sbr.score, SeqCst);
-                            eprintln!("improvement for problem {}: {}", problem_id, sbr.score);
+                        if sbr.score() < local_best_score.load(SeqCst) {
+                            local_best_score.store(sbr.score(), SeqCst);
+                            eprintln!("improvement for problem {}: {}", problem_id, sbr.score());
 
                             let br = do_bricks(&problem, &initial_moves, blueprint.clone());
                             assert_eq!(sbr.cost, br.cost);
@@ -214,23 +216,20 @@ impl Blueprint {
 
 #[allow(dead_code)]
 struct SimulateBrickResult {
-    score: i64,
     dist: i64,
     cost: i64,
 }
 
-fn simulate_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint, wcache: &mut WCache) -> SimulateBrickResult {
+impl SimulateBrickResult {
+    fn score(&self) -> i64 { self.dist + self.cost }
+}
+
+fn simulate_bricks(problem: &Problem, blueprint: Blueprint, wcache: &mut WCache) -> SimulateBrickResult {
     let _t = crate::stats_timer!("simulate_bricks").time_it();
-    let mut painter = PainterState::new(problem);
-    for m in initial_moves {
-        painter.apply_move(m);
-    }
-    assert_eq!(painter.blocks.len(), 1);
     let Blueprint { mut ys, mut xss } = blueprint;
 
-    let mut cost = painter.cost;
+    let mut cost = 0;
     let mut dist = 0.0;
-    drop(painter);
 
     ys[0] = 0;
     *ys.last_mut().unwrap() = problem.target.height;
@@ -302,7 +301,6 @@ fn simulate_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Bluepri
     let dist = (dist * 0.005).round() as i64;
 
     SimulateBrickResult {
-        score: dist + cost,
         cost,
         dist,
     }
