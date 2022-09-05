@@ -216,6 +216,13 @@ fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) ->
     let mut block_id = painter.blocks.keys().next().unwrap().clone();
     let Blueprint { mut ys, mut xss } = blueprint;
 
+    let mut cost = painter.cost;
+
+    // For simplicity, so we don't have to compute cost on margins.
+    ys[0] = 0;
+    *ys.last_mut().unwrap() = problem.target.height;
+
+    /*
     let y1 = ys[0];
     let y2 = *ys.last().unwrap();
     if y1 < problem.target.height - y2 {
@@ -252,9 +259,10 @@ fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) ->
                 line_number: y1,
             }).new_block_ids[1].clone();
         }
-    }
+    }*/
 
     loop {
+        let h = *ys.last().unwrap() - ys[0];
         let y1;
         let y2;
         let mut xs;
@@ -317,8 +325,11 @@ fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) ->
             merge_stack.push(ids.pop().unwrap());
         }*/
 
+        let mut merge_cost = 0;
+
         // horizontal cutting
         loop {
+            let w = *xs.last().unwrap() - xs[0];
             let cut_left;
             let x1;
             let x2;
@@ -337,28 +348,38 @@ fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) ->
             let color = crate::color_util::optimal_color_for_block(
                 &problem.target, &Shape { x1, y1, x2, y2 });
             let m = ColorMove { block_id: block_id.clone(), color };
-            painter.apply_move(&m);
+            let dc2 = painter.apply_move(&m).cost;
+            let dc = problem.cost(problem.base_costs.color, w * h);
+            assert_eq!(painter.blocks[&block_id].shape.size(), w * h);
+            assert_eq!(dc, dc2);
+            cost += dc;
 
             if xs.len() == 1 {
                 break;
             }
 
+            let dc = problem.cost(problem.base_costs.lcut, w * h);
+            cost += dc;
+            merge_cost += problem.cost(problem.base_costs.merge, (x2 - x1).max(w - (x2 - x1)) * h);
+
             if cut_left {
-                let mut ids = painter.apply_move(&Move::LCut {
+                let mut res = painter.apply_move(&Move::LCut {
                     block_id,
                     orientation: Orientation::Vertical,
                     line_number: x2,
-                }).new_block_ids;
-                block_id = ids.pop().unwrap();
-                merge_stack.push(ids.pop().unwrap());
+                });
+                assert_eq!(dc, res.cost);
+                block_id = res.new_block_ids.pop().unwrap();
+                merge_stack.push(res.new_block_ids.pop().unwrap());
             } else {
-                let mut ids = painter.apply_move(&Move::LCut {
+                let mut res = painter.apply_move(&Move::LCut {
                     block_id,
                     orientation: Orientation::Vertical,
                     line_number: x1,
-                }).new_block_ids;
-                merge_stack.push(ids.pop().unwrap());
-                block_id = ids.pop().unwrap();
+                });
+                assert_eq!(dc, res.cost);
+                merge_stack.push(res.new_block_ids.pop().unwrap());
+                block_id = res.new_block_ids.pop().unwrap();
             }
         }
 
@@ -373,25 +394,36 @@ fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) ->
                 block_id2: id,
             }).new_block_ids[0].clone();
         }
+        cost += merge_cost;
+
+        let dc = problem.cost(problem.base_costs.lcut, problem.width * h);
+        cost += dc;
 
         if cut_bottom {
-            block_id = painter.apply_move(&Move::LCut {
+            let mut res = painter.apply_move(&Move::LCut {
                 block_id,
                 orientation: Orientation::Horizontal,
                 line_number: y2,
-            }).new_block_ids[1].clone();
+            });
+            block_id = res.new_block_ids.pop().unwrap();
+            assert_eq!(dc, res.cost);
         } else {
-            block_id = painter.apply_move(&Move::LCut {
+            let mut res = painter.apply_move(&Move::LCut {
                 block_id,
                 orientation: Orientation::Horizontal,
                 line_number: y1,
-            }).new_block_ids[0].clone();
+            });
+            res.new_block_ids.pop().unwrap();
+            block_id = res.new_block_ids.pop().unwrap();
+            assert_eq!(dc, res.cost);
         }
     }
 
     let img = painter.render();
     let dist = image_distance(&problem.target, &img).round() as i64;
     let score = painter.cost + dist;
+
+    assert_eq!(cost, painter.cost);
 
     BrickResult {
         score,

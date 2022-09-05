@@ -515,12 +515,12 @@ enum PainterStateAction {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct BaseCosts {
-    pub lcut: i32,
-    pub pcut: i32,
-    pub merge: i32,
-    pub swap: i32,
-    pub color: i32,
+pub struct BaseCosts {
+    pub lcut: i64,
+    pub pcut: i64,
+    pub merge: i64,
+    pub swap: i64,
+    pub color: i64,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -720,7 +720,7 @@ impl<'a> PainterState<'a> {
             }
         }
         let extra_cost =
-            ((base_cost * self.width * self.height + (block_size + 1) / 2) / block_size) as i64;
+            (base_cost * (self.width * self.height) as i64 + (block_size as i64 + 1) / 2) / block_size as i64;
         self.cost += extra_cost;
         actions.push(IncrementCost {
             added_cost: extra_cost,
@@ -915,7 +915,7 @@ pub struct Problem {
     pub initial_img: Option<Image>,
     pub target: Image,
     start_blocks: Vec<(BlockId, Block)>,
-    base_costs: BaseCosts,
+    pub base_costs: BaseCosts,
 }
 
 impl Problem {
@@ -1036,6 +1036,10 @@ impl Problem {
             start_blocks: new_start_blocks,
             base_costs: self.base_costs.clone(),
         }
+    }
+
+    pub fn cost(&self, base: i64, size: i32) -> i64 {
+        (base * (self.width * self.height) as i64 + (size as i64 + 1) / 2) / size as i64
     }
 }
 
