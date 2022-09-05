@@ -28,9 +28,10 @@ struct Shared {
 #[derive(Clone)]
 struct SolverArgs {
     transposed: bool,
+    ys: Vec<i32>,
 }
 
-crate::entry_point!("brick_solver", brick_solver);
+crate::entry_point!("brick_solver", brick_solver, _EP1);
 fn brick_solver() {
     let mut pargs = pico_args::Arguments::from_vec(std::env::args_os().skip(2).collect());
     let problems: String = pargs.value_from_str("--problem").unwrap();
@@ -73,7 +74,7 @@ fn brick_solver() {
                         if dry_run {
                             eprintln!("dry run: pretend submit improvement for problem {}", problem_id);
                         } else {
-                            upload_solution(&mut tx, problem_id, &moves, "brick", &serde_json::to_value(&solver_args).unwrap(), incovation_id);
+                            upload_solution(&mut tx, problem_id, &moves, "brick DP", &serde_json::to_value(&solver_args).unwrap(), incovation_id);
                         }
                     }
                 }
@@ -85,7 +86,7 @@ fn brick_solver() {
                 }
 
                 let q = crate::stats_timer!("simulate_bricks").count.get() as f64 / start.elapsed().as_secs_f64();
-                eprintln!("{} simulate_bricks per second", q.round() as i64);
+                eprintln!("{} simulate_bricks per second", q);
                 eprintln!();
             }
         });
@@ -104,24 +105,25 @@ fn brick_solver() {
                     let mut painter = PainterState::new(&problem);
                     let (_, initial_moves) = seg_util::merge_all(&mut painter);
                     let initial_cost = painter.cost;
-                    let mut best_blueprint = Blueprint::random();
+                    let mut best_ys = random_seps();
                     loop {
-                        let blueprint = if thread_rng().gen_bool(0.5) {
-                            let mut b = best_blueprint.clone();
-                            b.mutate();
-                            b
+                        let ys = if thread_rng().gen_bool(0.5) {
+                            let mut ys = best_ys.clone();
+                            mutate_sep(&mut ys);
+                            ys
                         } else {
-                            Blueprint::random()
+                            random_seps()
                         };
 
-                        // let (dp_score, _) = dp(&problem, blueprint.ys.clone(), &mut wcache);
+                        let (dp_score, xss) = dp(&problem, ys.clone(), &mut wcache);
 
-                        let mut sbr = simulate_bricks(&problem, blueprint.clone(), &mut wcache);
-                        // eprintln!("{} {}", sbr.score(), dp_score);
+                        let mut sbr = simulate_bricks(&problem, ys.clone(), xss.clone(), &mut wcache);
+                        assert!((sbr.score() as f64 - dp_score) <= 2.0);
+                        // eprintln!("*********** {} {}", sbr.score(), dp_score);
 
                         sbr.cost += initial_cost;
                         if thread_rng().gen_bool(0.01) {
-                            let br = do_bricks(&problem, &initial_moves, blueprint.clone());
+                            let br = do_bricks(&problem, &initial_moves, ys.clone(), xss.clone());
                             assert_eq!(sbr.cost, br.cost);
                             assert!((sbr.dist - br.dist).abs() <= 1);  // just in case there are rounding errors
                         }
@@ -129,13 +131,13 @@ fn brick_solver() {
                         // eprintln!("{} {}", problem_id, score);
                         if sbr.score() < local_best_score.load(SeqCst) {
                             local_best_score.store(sbr.score(), SeqCst);
-                            eprintln!("improvement for problem {}: {}", problem_id, sbr.score());
+                            eprintln!("improvement for problem {}: {}   {:?}", problem_id, sbr.score(), ys);
 
-                            let br = do_bricks(&problem, &initial_moves, blueprint.clone());
+                            let br = do_bricks(&problem, &initial_moves, ys.clone(), xss.clone());
                             assert_eq!(sbr.cost, br.cost);
                             assert!((sbr.dist - br.dist).abs() <= 1);  // just in case there are rounding errors
 
-                            best_blueprint = blueprint.clone();
+                            best_ys = ys.clone();
                             let shared = &mut *shared.lock().unwrap();
                             let best_score = shared.best_scores.get_mut(&problem_id).unwrap();
                             if br.score < *best_score {
@@ -147,6 +149,7 @@ fn brick_solver() {
                                 *best_score = br.score;
                                 let a = SolverArgs {
                                     transposed,
+                                    ys: ys.clone(),
                                 };
                                 shared.improvements.insert(problem_id, (a, moves));
                             }
@@ -187,37 +190,6 @@ fn mutate_sep(seps: &mut Vec<i32>) {
     seps.sort();
 }
 
-#[derive(Clone)]
-struct Blueprint {
-    ys: Vec<i32>,
-    xss: Vec<Vec<i32>>,
-}
-
-impl Blueprint {
-    fn random() -> Blueprint {
-        let ys = random_seps();
-        let mut xss = vec![];
-        for _ in 1..ys.len() {
-            xss.push(random_seps());
-        }
-        Blueprint { ys, xss }
-    }
-
-    fn mutate(&mut self) {
-        if thread_rng().gen_bool(0.3) {
-            let i = thread_rng().gen_range(0..self.xss.len());
-            mutate_sep(&mut self.xss[i]);
-            return;
-        }
-        if thread_rng().gen_bool(0.3) {
-            mutate_sep(&mut self.ys);
-            return;
-        }
-        let i = thread_rng().gen_range(0..self.xss.len());
-        self.xss[i] = random_seps();
-    }
-}
-
 fn to_recipe(mut xs: Vec<i32>) -> Vec<i32> {
     let mut res = vec![];
     loop {
@@ -240,6 +212,36 @@ fn to_recipe(mut xs: Vec<i32>) -> Vec<i32> {
 struct SimulateBrickResult {
     dist: i64,
     cost: i64,
+}
+
+crate::entry_point!("dp_demo", dp_demo, _EP2);
+fn dp_demo() {
+    let start = std::time::Instant::now();
+    let problem = Problem::load(17);
+    let mut wcache = WCache::new();
+    let ys = vec![0, 200, 400];
+    let (score, xss) = dp(&problem, ys.clone(), &mut wcache);
+    eprintln!("score: {}", score);
+    for xs in &xss {
+        eprintln!("xs = {:?}", xs)
+    }
+
+    let sbr = simulate_bricks(&problem, ys.clone(), xss.clone(), &mut wcache);
+    dbg!(sbr.score());
+
+    let br = do_bricks(&problem, &[], ys, xss);
+    dbg!(br.score);
+
+
+    let mut painter = PainterState::new(&problem);
+    for m in &br.moves {
+        painter.apply_move(m);
+    }
+    painter.render().save(&project_path("outputs/dp.png"));
+
+
+    eprintln!("{}", crate::stats::STATS.render());
+    eprintln!("it took {:?}", start.elapsed());
 }
 
 fn dp(problem: &Problem, mut ys: Vec<i32>, wcache: &mut WCache) -> (f64, Vec<Vec<i32>>) {
@@ -270,6 +272,9 @@ fn dp(problem: &Problem, mut ys: Vec<i32>, wcache: &mut WCache) -> (f64, Vec<Vec
         xss.push(xs);
         score += row_score;
 
+        if last {
+            break;
+        }
         score += problem.cost(problem.base_costs.lcut, problem.width * (yy2 - yy1)) as f64;
 
         if sy > 0 {
@@ -285,9 +290,19 @@ fn dp(problem: &Problem, mut ys: Vec<i32>, wcache: &mut WCache) -> (f64, Vec<Vec
 fn row_dp(problem: &Problem, y1: i32, y2: i32, h: i32, merge: bool, wcache: &mut WCache) -> (f64, Vec<i32>) {
     let _t = crate::stats_timer!("row_dp").time_it();
     let mut best: HashMap<(i32, i32), (f64, Vec<i32>)> = HashMap::default();
+
+    const MOD: i32 = 10;
+    assert_eq!(problem.width % MOD, 0);
+
     for w in 1..=problem.width {
-        dbg!(w);
+        if w % MOD != 0 {
+            continue;
+        }
+        // dbg!(w);
         for x1 in 0..=problem.width - w {
+            if x1 % MOD != 0 {
+                continue;
+            }
             let x2 = x1 + w;
             let mut best_score =
                 wcache.get_dist(Shape {x1, y1, x2, y2}, problem) * 0.005 +
@@ -298,13 +313,19 @@ fn row_dp(problem: &Problem, y1: i32, y2: i32, h: i32, merge: bool, wcache: &mut
                 problem.cost(problem.base_costs.color, (x2 - x1) * h) as f64 +
                 problem.cost(problem.base_costs.lcut, (x2 - x1) * h) as f64;
             for x in x1 + 1 .. x2 {
+                if x % MOD != 0 {
+                    continue;
+                }
+                // if !thread_rng().gen_bool(0.01) {
+                //     continue;
+                // }
                 let merge_cost = if merge {
                     problem.cost(problem.base_costs.merge, h * (x - x1).max(x2 - x)) as f64
                 } else {
                     0.0
                 };
 
-                let (score1, sol1) = &best[&(x1, x)];
+                let (score1, sol1) = &best[&(x, x2)];
                 let score =
                     wcache.get_dist(Shape {x1, y1, x2: x, y2}, problem) * 0.005 +
                     color_and_cut_cost + merge_cost +
@@ -315,7 +336,7 @@ fn row_dp(problem: &Problem, y1: i32, y2: i32, h: i32, merge: bool, wcache: &mut
                     best_sol.push(x - x1);
                 }
 
-                let (score2, sol2) = &best[&(x, x2)];
+                let (score2, sol2) = &best[&(x1, x)];
                 let score =
                     wcache.get_dist(Shape {x1: x, y1, x2, y2}, problem) * 0.005 +
                     color_and_cut_cost + merge_cost +
@@ -331,16 +352,17 @@ fn row_dp(problem: &Problem, y1: i32, y2: i32, h: i32, merge: bool, wcache: &mut
         }
     }
 
-    best.remove(&(0, problem.width)).unwrap()
+    let (score, mut xs) = best.remove(&(0, problem.width)).unwrap();
+    xs.reverse();
+    (score, xs)
 }
 
 impl SimulateBrickResult {
     fn score(&self) -> i64 { self.dist + self.cost }
 }
 
-fn simulate_bricks(problem: &Problem, blueprint: Blueprint, wcache: &mut WCache) -> SimulateBrickResult {
+fn simulate_bricks(problem: &Problem, mut ys: Vec<i32>, mut xss: Vec<Vec<i32>>, wcache: &mut WCache) -> SimulateBrickResult {
     let _t = crate::stats_timer!("simulate_bricks").time_it();
-    let Blueprint { mut ys, mut xss } = blueprint;
 
     let mut cost = 0;
     let mut dist = 0.0;
@@ -352,23 +374,23 @@ fn simulate_bricks(problem: &Problem, blueprint: Blueprint, wcache: &mut WCache)
         let h = *ys.last().unwrap() - ys[0];
         let y1;
         let y2;
-        let mut xs;
         if ys[1] - ys[0] < ys[ys.len() - 1] - ys[ys.len() - 2] {
             y1 = ys[0];
             y2 = ys[1];
             ys.remove(0);
-            xs = xss.remove(0);
+            // xs = xss.remove(0);
         } else {
             y1 = ys[ys.len() - 2];
             y2 = ys[ys.len() - 1];
             ys.pop().unwrap();
-            xs = xss.pop().unwrap();
+            // xs = xss.pop().unwrap();
         }
 
-        xs[0] = 0;
-        *xs.last_mut().unwrap() = problem.target.width;
+        // xs[0] = 0;
+        // *xs.last_mut().unwrap() = problem.target.width;
 
-        let xs = to_recipe(xs);
+        // let xs = to_recipe(xs);
+        let xs = xss.remove(0);
 
         let mut merge_cost = 0;
 
@@ -428,7 +450,7 @@ struct BrickResult {
     cost: i64,
     moves: Vec<Move>,
 }
-fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) -> BrickResult {
+fn do_bricks(problem: &Problem, initial_moves: &[Move], mut ys: Vec<i32>, mut xss: Vec<Vec<i32>>) -> BrickResult {
     let _t = crate::stats_timer!("do_bricks").time_it();
     let mut painter = PainterState::new(problem);
     for m in initial_moves {
@@ -436,7 +458,6 @@ fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) ->
     }
     assert_eq!(painter.blocks.len(), 1);
     let mut block_id = painter.blocks.keys().next().unwrap().clone();
-    let Blueprint { mut ys, mut xss } = blueprint;
 
     let mut cost = painter.cost;
     let mut dist = 0.0;
@@ -449,30 +470,30 @@ fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) ->
         let h = *ys.last().unwrap() - ys[0];
         let y1;
         let y2;
-        let mut xs;
+        // let mut xs;
         let cut_bottom;
         if ys[1] - ys[0] < ys[ys.len() - 1] - ys[ys.len() - 2] {
             cut_bottom = true;
             y1 = ys[0];
             y2 = ys[1];
             ys.remove(0);
-            xs = xss.remove(0);
+            // xs = xss.remove(0);
         } else {
             cut_bottom = false;
             y1 = ys[ys.len() - 2];
             y2 = ys[ys.len() - 1];
             ys.pop().unwrap();
-            xs = xss.pop().unwrap();
+            // xs = xss.pop().unwrap();
         }
 
         let mut merge_stack: Vec<BlockId> = vec![];
 
         // Because we can't support different left and right margins
         // for different rows. They interfere.
-        xs[0] = 0;
-        *xs.last_mut().unwrap() = problem.target.width;
-
-        let xs = to_recipe(xs);
+        // xs[0] = 0;
+        // *xs.last_mut().unwrap() = problem.target.width;
+        // let xs = to_recipe(xs);
+        let xs = xss.remove(0);
 
         let mut merge_cost = 0;
 
