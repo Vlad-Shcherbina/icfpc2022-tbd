@@ -107,6 +107,13 @@ void ISL_Paint(ISL *isl, const BlockData *bd, PixelColor a) {
 
 /*--------------------------------------------------------------------------*/
 
+ISL *ISL_Create(void) {
+    ISL *isl = Memory_Reserve(1, ISL);
+    return isl;
+}
+
+/*--------------------------------------------------------------------------*/
+
 void ISL_LCut(ISL *isl, blockid bid, int o, int l) {
     isl->opcode = ISL_LCUT;
     isl->lcut.id = bid;
@@ -129,6 +136,62 @@ void ISL_Paint(ISL *isl, blockid bid, PixelColor a) {
     isl->opcode = ISL_COLOR;
     isl->color.id = bid;
     isl->color.col = a;
+}
+
+/*--------------------------------------------------------------------------*/
+
+void ISL_Merge(ISL *isl, blockid bid1, blockid bid2) {
+    isl->opcode = ISL_MERGE;
+    isl->merge.id[0] = bid1;
+    isl->merge.id[1] = bid2;
+}
+
+/*--------------------------------------------------------------------------*/
+
+void ISL_Swap(ISL *isl, blockid bid1, blockid bid2) {
+    isl->opcode = ISL_SWAP;
+    isl->swap.id[0] = bid1;
+    isl->swap.id[1] = bid2;
+}
+
+/*--------------------------------------------------------------------------*/
+
+ISL *ISL_CreateLCut(blockid bid, int o, int l) {
+    ISL *isl = ISL_Create();
+    ISL_LCut(isl, bid, o, l);
+    return isl;
+}
+
+/*--------------------------------------------------------------------------*/
+
+ISL *ISL_CreatePCut(blockid bid, int x, int y) {
+    ISL *isl = ISL_Create();
+    ISL_PCut(isl, bid, x, y);
+    return isl;
+}
+
+/*--------------------------------------------------------------------------*/
+
+ISL *ISL_CreatePaint(blockid bid, PixelColor a) {
+    ISL *isl = ISL_Create();
+    ISL_Paint(isl, bid, a);
+    return isl;
+}
+
+/*--------------------------------------------------------------------------*/
+
+ISL *ISL_CreateMerge(blockid bid1, blockid bid2) {
+    ISL *isl = ISL_Create();
+    ISL_Merge(isl, bid1, bid2);
+    return isl;
+}
+
+/*--------------------------------------------------------------------------*/
+
+ISL *ISL_CreateSwap(blockid bid1, blockid bid2) {
+    ISL *isl = ISL_Create();
+    ISL_Swap(isl, bid1, bid2);
+    return isl;
 }
 
 /*--------------------------------------------------------------------------*/

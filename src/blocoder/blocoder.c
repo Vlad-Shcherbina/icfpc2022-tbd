@@ -8,6 +8,7 @@
 #include "isl.h"
 #include "islseq.h"
 #include "memory.h"
+#include "stdfunc.h"
 #include "string.h"
 
 #include <math.h>
@@ -94,10 +95,6 @@ void BloCoder_Reset(BloCoder *blo) {
     blo->canvas = BitMap_Clone(blo->start_canvas);
     blo->master_blockid = blo->start_master_blockid;
 }
-
-/* ------------------------------------------------------------------------ */
-
-//void BloCoder_MergeAll
 
 /* ------------------------------------------------------------------------ */
 
@@ -338,9 +335,20 @@ PixelColor BloCoder_GeometricMeanColor(const BloCoder *blo,  int xmin, int ymin,
         while (m>0) m-= nof[c][b--];
         ret.v[c] = b+1;
     }
-//    printf("%i %i %i %i\n", ret.r, ret.g, ret.b, ret.a);
     return ret;
 }
+
+/* ------------------------------------------------------------------------ */
+
+PixelColor BloCoder_GeometricMeanColorBD(const BloCoder *blo, const BlockData *bd) {
+    int xmin = IntCoord_X(bd->ul);
+    int ymin = IntCoord_Y(bd->ul);
+    int xmax = IntCoord_X(bd->br);
+    int ymax = IntCoord_Y(bd->br);
+    return BloCoder_GeometricMeanColor(blo, xmin, ymin, xmax, ymax);
+}
+
+int debug = FALSE;
 
 /* ------------------------------------------------------------------------ */
 
@@ -408,6 +416,30 @@ BlocUndo *BloCoder_ApplyISL(BloCoder *bl, ISL *isl) {
             xmin[j] = IntCoord_X(parent[j]->ul);
             ymin[j] = IntCoord_Y(parent[j]->ul);
             xmax[j] = IntCoord_X(parent[j]->br);
+            ymax[j] = IntCoord_Y(parent[j]->br);
+        }
+
+        BitMap *a1 = BitMap_GetBitMap(bl->canvas, xmin[0], xmax[0], ymin[0], ymax[0]);
+        BitMap *a2 = BitMap_GetBitMap(bl->canvas, xmin[1], xmax[1], ymin[1], ymax[1]);
+        BitMap_PutBitMapNoClip(bl->canvas, a2, xmin[0], ymin[0]);
+        BitMap_PutBitMapNoClip(bl->canvas, a1, xmin[1], ymin[1]);
+        BitMap_Destroy(a1);
+        BitMap_Destroy(a2);
+
+        undo->score *= bl->target_size;
+        undo->score = 0.5 + (double)undo->score / (double)parent[0]->area;
+        SWAP(parent[0]->ul, parent[1]->ul);
+        SWAP(parent[0]->br, parent[1]->br);
+        SWAP(parent[0]->coord, parent[1]->coord);
+#if 0
+        BlockData *parent[2];
+        int xmin[2], ymin[2], xmax[2], ymax[2];
+        
+        for (int j=0; j<2; j++) {
+            parent[j] = BloCoder_LookUp(bl, isl->swap.id[j]);
+            xmin[j] = IntCoord_X(parent[j]->ul);
+            ymin[j] = IntCoord_Y(parent[j]->ul);
+            xmax[j] = IntCoord_X(parent[j]->br);
             ymax[j] = IntCoord_Y(parent[j]->br);        }
         /* Better: loop through list and compare */
         if (xmax[1] - xmin[1] == xmax[0] - xmin[0] && ymax[1] - ymin[1] == ymax[0] - ymin[0]) {
@@ -422,6 +454,15 @@ BlocUndo *BloCoder_ApplyISL(BloCoder *bl, ISL *isl) {
         }
         undo->score *= bl->target_size;
         undo->score = 0.5 + (double)undo->score / (double)parent[0]->area;
+        SWAP(parent[0]->ul, parent[1]->ul);
+        SWAP(parent[0]->br, parent[1]->br);
+        SWAP(parent[0]->coord, parent[1]->coord);
+        if (debug) {
+            printf("Swap %li and %li\n", parent[0]->id.digits, parent[1]->id.digits);
+            BlockData_Print(parent[0]);
+            BlockData_Print(parent[1]);
+        }
+#endif
         break; }
     case ISL_MERGE: {
         BlockData *parent[2];
@@ -436,6 +477,11 @@ BlocUndo *BloCoder_ApplyISL(BloCoder *bl, ISL *isl) {
         DArray_Add(bl->blockdata, b);
         undo->score *= bl->target_size;
         undo->score = 0.5 + (double)undo->score / MAX(parent[0]->area, parent[1]->area);
+        if (debug) {
+        printf("Merge %i and %li to new id %li\n", parent[0]->id.digits, parent[1]->id.digits, b->id.digits);
+        BlockData_Print(parent[0]);
+        BlockData_Print(parent[1]);
+        }
         /* TODO */
         break; }
     case ISL_COLOR: {
@@ -484,17 +530,53 @@ void BloCoder_UndoISL(BloCoder *bl, ISL *isl, const BlocUndo *undo) {
         
         for (int j=0; j<2; j++) {
             parent[j] = BloCoder_LookUp(bl, isl->swap.id[j]);
-            xmin[j] = xmax[j] = BlockData_X(parent[j], 0);
-            ymin[j] = ymax[j] = BlockData_X(parent[j], 0);
-            for (int i=1; i<BlockData_NofCoords(parent[j]); i++) {
-                if (BlockData_X(parent[j], i) < xmin[j]) xmin[j] = BlockData_X(parent[j], i);
-                else
-                if (BlockData_X(parent[j], i) > xmax[j]) xmax[j] = BlockData_X(parent[j], i);
-                if (BlockData_Y(parent[j], i) < ymin[j]) ymin[j] = BlockData_Y(parent[j], i);
-                else
-                if (BlockData_Y(parent[j], i) > ymax[j]) ymax[j] = BlockData_Y(parent[j], i);
-            }
+            xmin[j] = IntCoord_X(parent[j]->ul);
+            ymin[j] = IntCoord_Y(parent[j]->ul);
+            xmax[j] = IntCoord_X(parent[j]->br);
+            ymax[j] = IntCoord_Y(parent[j]->br);
         }
+
+        BitMap *a1 = BitMap_GetBitMap(bl->canvas, xmin[0], xmax[0], ymin[0], ymax[0]);
+        BitMap *a2 = BitMap_GetBitMap(bl->canvas, xmin[1], xmax[1], ymin[1], ymax[1]);
+        BitMap_PutBitMapNoClip(bl->canvas, a2, xmin[0], ymin[0]);
+        BitMap_PutBitMapNoClip(bl->canvas, a1, xmin[1], ymin[1]);
+        BitMap_Destroy(a1);
+        BitMap_Destroy(a2);
+
+        SWAP(parent[0]->ul, parent[1]->ul);
+        SWAP(parent[0]->br, parent[1]->br);
+        SWAP(parent[0]->coord, parent[1]->coord);
+
+#if 0
+        BlockData *parent[2];
+
+        int xmin[2], ymin[2], xmax[2], ymax[2];
+
+        for (int j=0; j<2; j++) {
+            parent[j] = BloCoder_LookUp(bl, isl->swap.id[j]);
+        }
+        
+        SWAP(parent[0]->ul, parent[1]->ul);
+        SWAP(parent[0]->br, parent[1]->br);
+        SWAP(parent[0]->coord, parent[1]->coord);
+        
+        for (int j=0; j<2; j++) {
+            xmin[j] = IntCoord_X(parent[j]->ul);
+            ymin[j] = IntCoord_X(parent[j]->ul);
+            xmax[j] = IntCoord_X(parent[j]->br);
+            ymax[j] = IntCoord_X(parent[j]->br);
+        }
+
+        if (debug) printf("Canvas score before undo swap %i\n", BloCoder_CanvasScore(bl));
+        BitMap *a2 = BitMap_GetBitMap(bl->canvas, xmin[0], xmax[0], ymin[0], ymax[0]);
+        BitMap *a1 = BitMap_GetBitMap(bl->canvas, xmin[1], xmax[1], ymin[1], ymax[1]);
+        BitMap_PutBitMap(bl->canvas, a1, xmin[0], ymin[0]);
+        BitMap_PutBitMap(bl->canvas, a2, xmin[1], ymin[1]);
+        BitMap_Destroy(a1);
+        BitMap_Destroy(a2);
+        if (debug) printf("Canvas score after undo swap %i\n", BloCoder_CanvasScore(bl));
+#endif
+#if 0
         /* Better: loop through list and compare */
         if (xmax[1] - xmin[1] == xmax[0] - xmin[0] && ymax[1] - ymin[1] == ymax[0] - ymin[0]) {
             BitMap *a1 = BitMap_GetBitMap(bl->canvas, xmin[0], xmax[0], ymin[0], ymax[0]);
@@ -506,6 +588,7 @@ void BloCoder_UndoISL(BloCoder *bl, ISL *isl, const BlocUndo *undo) {
         } else {
             fprintf(stderr, "SWAP between incompatible regions\n");
         }
+#endif
         break; }
     case ISL_MERGE: {
         BlockData *parent[2];
@@ -515,6 +598,7 @@ void BloCoder_UndoISL(BloCoder *bl, ISL *isl, const BlocUndo *undo) {
         parent[1]->valid = TRUE;
         BloCoder_Delete(bl, undo->result->id);
         BlockData_Destroy(undo->result);
+        bl->master_blockid--;
         break; }
     case ISL_COLOR: {
         BlockData *parent = BloCoder_LookUp(bl, isl->color.id);
@@ -528,7 +612,7 @@ void BloCoder_UndoISL(BloCoder *bl, ISL *isl, const BlocUndo *undo) {
 */
         BitMap_PutBitMap(bl->canvas, undo->bg, xmin, ymin);
         break; }
-    default:
+    default: ;
     }
 }
 
@@ -593,8 +677,8 @@ int BloCoder_Solver(BloCoder *blo, BlockData *parent, ISL *isl, int *islc, int d
 //    if (depth > 1) {
         int steplenl = 4;
         if (depth > 1) steplenl = 7;
-        int steplenp = 9;
-        if (depth > 1) steplenp = MIN(32, MAX(4, (xmax-xmin-2)/2));
+        int steplenp = 11;
+        if (depth > 1) steplenp = MIN(24, MAX(4, (xmax-xmin-2)/2));
         /* generate lcuts. pcuts */
         for (int l=xmin+2; l<xmax-2; l+=steplenl)
              ISL_LCut(newisl + newislc++, parent->id, 0, l);
@@ -655,7 +739,6 @@ int BloCoder_Solver(BloCoder *blo, BlockData *parent, ISL *isl, int *islc, int d
 
 int BloCoder_ScoreSeq(BloCoder *blo, ISLSeq *seq) {
     BlocUndo *undo[ISLSeq_NofISL(seq)];
-
     seq->opscore = 0;
 
     for (int i=0; i<ISLSeq_NofISL(seq); i++) {
@@ -726,7 +809,7 @@ void BloCoder_ISLPostProcess(const char *filename, ISLSeq *sseq) {
     
     do {
         improved = FALSE;
-        printf("Local optimizer writes\n");
+        printf("Problem %2i : Local optimizer writes intermediate step (score=%i)\n", global_prob_id, sseq->score);
         printf("----------------------------------\n");
         ISLSeq_ToFile(sseq, global_prob_id);
         printf("----------------------------------\n");
@@ -738,7 +821,7 @@ void BloCoder_ISLPostProcess(const char *filename, ISLSeq *sseq) {
                 for (int c=0; c<4; c++) {
 nextdec:
                     if (isl->color.col.v[c] > 1) {
-                        isl->color.col.v[c]-=2;
+                        isl->color.col.v[c]--;
                         score = BloCoder_ScoreSeq(blo, sseq);
                         if (score < bestscore) {
                             ISLSeq_Destroy(bestseq);
@@ -748,11 +831,14 @@ nextdec:
                             improved = TRUE;
                             goto nextdec;
                         } else
+                        if (score == bestscore) goto nextdec;
+                        else
                             isl->color.col.dword = orgcol.dword;
-                    }
+                    } else
+                        isl->color.col.dword = orgcol.dword;
 nextinc:
                     if (isl->color.col.v[c] < 254) {
-                        isl->color.col.v[c]-=2;
+                        isl->color.col.v[c]++;
                         score = BloCoder_ScoreSeq(blo, sseq);
                         if (score < bestscore) {
                             ISLSeq_Destroy(bestseq);
@@ -762,8 +848,11 @@ nextinc:
                             improved = TRUE;
                             goto nextinc;
                         } else
+                        if (score == bestscore) goto nextinc;
+                        else
                             isl->color.col.dword = orgcol.dword;
-                    }
+                    } else
+                        isl->color.col.dword = orgcol.dword;
                 }
                 break;
             case ISL_LCUT:
@@ -777,7 +866,7 @@ nextinc:
                         limitx = IntCoord_Y(parent->ul);
                 }
 nextdec2:
-                if (isl->lcut.l < limitx+1) {
+                if (isl->lcut.l > limitx+1) {
                     isl->lcut.l--;
                     score = BloCoder_ScoreSeq(blo, sseq);
                     if (score < bestscore) {
@@ -788,8 +877,12 @@ nextdec2:
                         improved = TRUE;
                         goto nextdec2;
                     } else
+                    if (score == bestscore) goto nextdec2;
+                    else
                         isl->lcut.l = orgx;
-                }
+                } else 
+                    isl->lcut.l = orgx;
+                    
                 if (isl->lcut.orientation == 0) {
                     if (parent == NULL) limitx = BitMap_SizeX(blo->target);
                     else limitx = IntCoord_X(parent->br);
@@ -799,7 +892,7 @@ nextdec2:
                 }
 nextinc2:
                 if (isl->lcut.l < limitx-1) {
-                    isl->lcut.l--;
+                    isl->lcut.l++;
                     score = BloCoder_ScoreSeq(blo, sseq);
                     if (score < bestscore) {
                         ISLSeq_Destroy(bestseq);
@@ -809,8 +902,11 @@ nextinc2:
                         improved = TRUE;
                         goto nextinc2;
                     } else
+                    if (score == bestscore) goto nextinc2;
+                    else
                         isl->lcut.l = orgx;
-                }
+                } else
+                    isl->lcut.l = orgx;
                 break;
 
             case ISL_PCUT:
@@ -822,7 +918,7 @@ nextinc2:
                 if (parent == NULL) limity = 0;
                 else limity = IntCoord_Y(parent->ul);
 nextdec3:
-                if (isl->pcut.x < limitx+1) {
+                if (isl->pcut.x > limitx+1) {
                     isl->pcut.x--;
                     score = BloCoder_ScoreSeq(blo, sseq);
                     if (score < bestscore) {
@@ -833,10 +929,13 @@ nextdec3:
                         improved = TRUE;
                         goto nextdec3;
                     } else
+                    if (score == bestscore) goto nextdec3;
+                    else
                         isl->pcut.x = orgx;
-                }
+                } else
+                    isl->pcut.x = orgx;
 nextdec4:
-                if (isl->pcut.y < limity+1) {
+                if (isl->pcut.y > limity+1) {
                     isl->pcut.y--;
                     score = BloCoder_ScoreSeq(blo, sseq);
                     if (score < bestscore) {
@@ -847,14 +946,18 @@ nextdec4:
                         improved = TRUE;
                         goto nextdec4;
                     } else
+                    if (score == bestscore) goto nextdec4;
+                    else
                         isl->pcut.y = orgy;
-                }
+                } else
+                    isl->pcut.y = orgy;
+                
                 if (parent == NULL) limitx = BitMap_SizeX(blo->target);
                 else limitx = IntCoord_X(parent->br);
                 if (parent == NULL) limity = BitMap_SizeY(blo->target);
                 else limity = IntCoord_Y(parent->br);                
 nextinc3:
-                if (isl->pcut.x > limitx+1) {
+                if (isl->pcut.x < limitx-1) {
                     isl->pcut.x++;
                     score = BloCoder_ScoreSeq(blo, sseq);
                     if (score < bestscore) {
@@ -865,10 +968,13 @@ nextinc3:
                         improved = TRUE;
                         goto nextinc3;
                     } else
+                    if (score == bestscore) goto nextinc3;
+                    else
                         isl->pcut.x = orgx;
-                }
+                } else
+                    isl->pcut.x = orgx;
 nextinc4:
-                if (isl->pcut.y > limity-1) {
+                if (isl->pcut.y < limity-1) {
                     isl->pcut.y++;
                     score = BloCoder_ScoreSeq(blo, sseq);
                     if (score < bestscore) {
@@ -878,8 +984,11 @@ nextinc4:
                         orgy = isl->pcut.y;
                         goto nextinc4;
                     } else
+                    if (score == bestscore) goto nextinc4;
+                    else
                         isl->pcut.y = orgy;
-                }
+                } else
+                    isl->pcut.y = orgy;
                 break;
             default: ;
 
@@ -926,6 +1035,136 @@ void printsol(int id, int bestscore, ISL *sol, int solc) {
 
 /* ------------------------------------------------------------------------ */
 
+void BloCoder_Swapper(BloCoder *blo, ISLSeq *bestseq) {
+    Bool swapped = FALSE;
+
+    int n = DArray_NofElems(blo->blockdata);
+    int **excluded = Int2_CreateVal(n, n, 0);
+
+    do {
+        ISLSeq *bestsol = ISLSeq_Create();
+        swapped = FALSE;
+        bestsol->score = bestseq->score;
+        printf("Problem %2i : Attempting swaps, score = %i\n", global_prob_id, bestsol->score);
+        for (int i=0; i<DArray_NofElems(blo->blockdata)-1; i++) {
+            BlockData *bdi = DArray_Elem(blo->blockdata, i);
+            if (bdi->valid) {
+                for (int j=i+1; j<DArray_NofElems(blo->blockdata); j++) {
+                    BlockData *bdj = DArray_Elem(blo->blockdata, j);
+                    if (bdj->valid && !excluded[i][j] && BlockData_IsSwappable(bdi, bdj)) {
+                        ISLSeq *sol = ISLSeq_Create();
+                        ISL *swp = ISL_CreateSwap(bdi->id, bdj->id);
+                        ISLSeq_Add(sol, swp);
+                        int sc1 = BloCoder_CanvasScore(blo);
+                        if (BloCoder_ScoreSeq(blo, sol) < bestsol->score) {
+                            ISLSeq_Destroy(bestsol);                            
+                            bestsol = ISLSeq_Clone(sol);
+                            printf("Problem %2i : Found swaps, score = %i\n", global_prob_id, bestsol->score);
+                            swapped = TRUE;
+                            for (int k=0; k<n; k++) {
+                                excluded[i][k] = excluded[k][i] = FALSE;
+                                excluded[j][k] = excluded[k][j] = FALSE;
+                            }
+                        } else {
+                            excluded[i][j] = excluded[j][i] = TRUE;
+                        }
+                        ISLSeq_Destroy(sol);
+                    }
+                }
+            }
+        }
+        if (swapped) {
+            BloCoder_ApplySeq(blo, bestsol);
+            ISLSeq_Append(bestseq, bestsol);
+            bestseq->score = bestsol->score;
+            bestseq->canvas_score = bestsol->canvas_score;
+            bestseq->opscore += bestsol->opscore;
+        }
+        ISLSeq_Destroy(bestsol);        
+    } while(swapped);
+    Int2_Destroy(excluded, n);
+}
+
+/* ------------------------------------------------------------------------ */
+
+void BloCoder_MergeAll(BloCoder *blo, ISLSeq *bestseq, Bool orientation) {
+    Bool mergeables = FALSE;
+    /*
+        for each mergeable pair:
+        1. evaluate separate paints
+        2. evaluate merge + paint
+        
+        merge/paint pair with best ratio. go on until no more mergeable pairs.
+    */
+    
+    do {
+        ISLSeq *bestsol = ISLSeq_Create();
+        bestsol->score = MAXINT;
+        mergeables = FALSE;
+        for (int i=0; i<DArray_NofElems(blo->blockdata)-1; i++) {
+            BlockData *bdi = DArray_Elem(blo->blockdata, i);
+            if (bdi->valid) {
+//                PixelColor medcoli = BloCoder_GeometricMeanColorBD(blo, bdi);
+                for (int j=i+1; j<DArray_NofElems(blo->blockdata); j++) {
+                    BlockData *bdj = DArray_Elem(blo->blockdata, j);
+                    if (bdj->valid && BlockData_IsMergeableOrient(bdi, bdj, orientation)) {
+                        ISLSeq *sol = ISLSeq_Create();
+/*
+                        PixelColor medcolj = BloCoder_GeometricMeanColorBD(blo, bdj);
+                        ISLSeq_Add(sol, ISL_CreatePaint(bdi->id, medcoli));
+                        ISLSeq_Add(sol, ISL_CreateMerge(bdi->id, bdj->id));
+                        if (BloCoder_ScoreSeq(blo, sol) < bestsol->score) {
+                            ISLSeq_Destroy(bestsol);
+                            bestsol = ISLSeq_Clone(sol);
+                        }
+                        ISLSeq_Destroy(sol);
+
+                        sol = ISLSeq_Create();
+                        ISLSeq_Add(sol, ISL_CreatePaint(bdi->id, medcolj));
+                        ISLSeq_Add(sol, ISL_CreateMerge(bdi->id, bdj->id));
+                        if (BloCoder_ScoreSeq(blo, sol) < bestsol->score) {
+                            ISLSeq_Destroy(bestsol);
+                            bestsol = ISLSeq_Clone(sol);
+                        }
+                        ISLSeq_Destroy(sol);
+
+                        sol = ISLSeq_Create();
+*/
+                        ISLSeq_Add(sol, ISL_CreateMerge(bdi->id, bdj->id));
+                        if (BloCoder_ScoreSeq(blo, sol) < bestsol->score) {
+                            ISLSeq_Destroy(bestsol);
+                            bestsol = ISLSeq_Clone(sol);
+                        }
+                        ISLSeq_Destroy(sol);
+
+                        mergeables = TRUE;  
+                    }
+                }
+            }
+        }
+        if (mergeables) {
+            int nof = 0;
+            BloCoder_ApplySeq(blo, bestsol);
+            ISLSeq_Append(bestseq, bestsol);
+            bestseq->score = bestsol->score;
+            bestseq->opscore += bestsol->opscore;
+            bestseq->canvas_score = bestsol->canvas_score;
+            for (int i=0; i<DArray_NofElems(blo->blockdata); i++) {
+                BlockData *bdi = DArray_Elem(blo->blockdata, i);
+                if (bdi->valid) {
+                    printf("%lu ", bdi->id.digits);
+                    nof++;
+                }                
+            }
+            
+            printf("\nProblem %2i : Best merge has score %i [ %i blocks remains ]\n", global_prob_id, bestsol->score, nof);
+        }
+        ISLSeq_Destroy(bestsol);
+    } while (mergeables);
+}
+
+/* ------------------------------------------------------------------------ */
+
 int main(int argc, String **argv) {
     BloCoder *blocoder;
     ISL isl[64];
@@ -935,7 +1174,8 @@ int main(int argc, String **argv) {
     String *picfile = argv[1];
     Bool improved = TRUE;
     ISLSeq *bestseq = ISLSeq_Create();
-   
+    srand(time(0));
+
     misc_init();
 
     if (argc < 2) {
@@ -951,7 +1191,15 @@ int main(int argc, String **argv) {
     global_prob_id = id = atoi(picfile+n+1);   
     start_time = Std_Time();
     bestseq->score = BloCoder_CanvasScore(blocoder);
-
+    
+    if (DArray_NofElems(blocoder->blockdata) > 1) {
+        Bool orientation = rand() & 1;
+        BloCoder_Swapper(blocoder, bestseq);
+        BloCoder_MergeAll(blocoder, bestseq, orientation);
+        BloCoder_MergeAll(blocoder, bestseq, !orientation);
+        printf("Problem %2i : preprocessing done, score=%i (%i ops, %i canvas)\n", bestseq->score, bestseq->opscore, bestseq->canvas_score);
+    }
+    
     while (improved) {
         ISLSeq *bestsol = ISLSeq_Create();
         bestsol->score = bestseq->score;
@@ -990,6 +1238,7 @@ int main(int argc, String **argv) {
         if (improved) {
             ISLSeq_Append(bestseq, bestsol);
             BloCoder_ISLPostProcess(picfile, bestseq);
+            printf("Problem %2i : Writing post-processed solution SCORE %i\n", id, bestseq->score);
             ISLSeq_ToFile(bestseq, id);
         }
     }

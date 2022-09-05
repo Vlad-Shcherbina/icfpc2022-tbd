@@ -73,6 +73,7 @@ void       BitMap_Circle(BitMap *bitmap, int cx, int cy, int r, PixelColor color
 void       BitMap_FloodFill(BitMap *bm, IntCoord pos, PixelColor initial, PixelColor p); /* Slow as helly */
 void       BitMap_DrawView(BitMap *canvas, BitMap *src, int dx1, int dy1, int dx2, int dy2, int sx, int sy, int scale, int stx, int sty);
 void       BitMap_PutBitMap(BitMap *canvas, const BitMap *image, int x, int y);
+void       BitMap_PutBitMapNoClip(BitMap *dst, const BitMap *sprite, int x1, int y1);
 BitMap    *BitMap_GetBitMap(const BitMap *org, int x1, int x2, int y1, int y2);
 void       BitMap_PutBitMapRecolour(BitMap *canvas, const BitMap *image, int x, int y, PixelColor color);
 void       BitMap_PutBitMapAlpha(BitMap *canvas, const BitMap *image, int x, int y);

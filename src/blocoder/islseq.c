@@ -106,6 +106,7 @@ void ISLSeq_Print(const ISLSeq *seq) {
         printf("%s\n", instr);
         String_Destroy(instr);
     }    
+    printf("Len = %i, Score = %i (%i instr, %i canvas)\n", ISLSeq_NofISL(seq), seq->score, seq->opscore, seq->canvas_score);
 }
 
 /*--------------------------------------------------------------------------*/

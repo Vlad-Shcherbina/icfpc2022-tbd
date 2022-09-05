@@ -21,6 +21,7 @@ typedef int Bool;
 #define IS_IN(x,a,b) ((a) <= (x) && (x) < (b))
 #define ARRLEN(x) (sizeof(x) / sizeof(x[0]))
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
+#define SWAP(a, b) do { __typeof__(a) temp = (a); (a)=(b); (b)=temp; } while(FALSE)
 
 #define ANSI_BLACK "\x1b[30m"
 #define ANSI_RED "\x1b[31m"

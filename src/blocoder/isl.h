@@ -65,9 +65,19 @@ void ISL_LCut(ISL *isl, const BlockData *bd, int o, int l);
 void ISL_PCut(ISL *isl, const BlockData *bd, int x, int y);
 void ISL_Paint(ISL *isl, const BlockData *bd, PixelColor a);
 */
+ISL *ISL_Create(void);
+
 void ISL_LCut(ISL *isl, blockid bid, int o, int l);
 void ISL_PCut(ISL *isl, blockid bid, int x, int y);
 void ISL_Paint(ISL *isl, blockid bid, PixelColor a);
+void ISL_Merge(ISL *isl, blockid bid1, blockid bid2);
+void ISL_Swap(ISL *isl, blockid bid1, blockid bid2);
+
+ISL *ISL_CreateLCut(blockid bid, int o, int l);
+ISL *ISL_CreatePCut(blockid bid, int x, int y);
+ISL *ISL_CreatePaint(blockid bid, PixelColor a);
+ISL *ISL_CreateMerge(blockid bid1, blockid bid2);
+ISL *ISL_CreateSwap(blockid bid1, blockid bid2);
 #define ISL_Color ISL_Paint
 #define ISL_Colour ISL_Paint
 Bool ISL_IsEqualPaint(ISL *isl1, ISL *isl2);

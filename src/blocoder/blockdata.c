@@ -65,7 +65,7 @@ BlockData *BlockData_CreateMerge(const BlockData *b1, const BlockData *b2) {
     const BlockData *parent[2] = { b1, b2 };
     int xmin, ymin, xmax, ymax;
     xmin = xmax = BlockData_X(parent[0], 0);
-    ymin = ymax = BlockData_X(parent[0], 0);
+    ymin = ymax = BlockData_Y(parent[0], 0);
     for (int j=0; j<2; j++) {
         for (int i=0; i<BlockData_NofCoords(parent[j]); i++) {
             if (BlockData_X(parent[j], i) < xmin) xmin = BlockData_X(parent[j], i);
@@ -104,8 +104,37 @@ BlockData *BlockData_Clone(const BlockData *b) {
 
 /* ------------------------------------------------------------------------ */
 
-Bool BlockData_IsMergeable(const BlockData *b1, const BlockData *b2) {
+Bool BlockData_IsMergeable(const BlockData *b1, const BlockData *b2) {   
+    if (IntCoord_X(b1->br) == IntCoord_X(b2->ul) && IntCoord_Y(b2->br) == IntCoord_Y(b1->br) && IntCoord_Y(b2->ul) == IntCoord_Y(b1->ul)) return TRUE;
+    if (IntCoord_X(b1->ul) == IntCoord_X(b2->br) && IntCoord_Y(b2->br) == IntCoord_Y(b1->br) && IntCoord_Y(b2->ul) == IntCoord_Y(b1->ul)) return TRUE;
+
+    if (IntCoord_Y(b1->br) == IntCoord_Y(b2->ul) && IntCoord_X(b2->br) == IntCoord_X(b1->br) && IntCoord_X(b2->ul) == IntCoord_X(b1->ul)) return TRUE;
+    if (IntCoord_Y(b1->ul) == IntCoord_Y(b2->br) && IntCoord_X(b2->br) == IntCoord_X(b1->br) && IntCoord_X(b2->ul) == IntCoord_X(b1->ul)) return TRUE;
+
     return FALSE;
+}
+
+/* ------------------------------------------------------------------------ */
+
+Bool BlockData_IsMergeableHoriz(const BlockData *b1, const BlockData *b2) {   
+    if (IntCoord_Y(b2->br) == IntCoord_Y(b1->br) && IntCoord_Y(b2->ul) == IntCoord_Y(b1->ul))
+        return (IntCoord_X(b1->br) == IntCoord_X(b2->ul) || IntCoord_X(b1->ul) == IntCoord_X(b2->br));
+    return FALSE;
+}
+
+/* ------------------------------------------------------------------------ */
+
+Bool BlockData_IsMergeableVert(const BlockData *b1, const BlockData *b2) {   
+    if (IntCoord_X(b2->br) == IntCoord_X(b1->br) && IntCoord_X(b1->ul) == IntCoord_X(b2->ul))
+        return (IntCoord_Y(b1->br) == IntCoord_Y(b2->ul) || IntCoord_Y(b1->ul) == IntCoord_Y(b2->br));
+    return FALSE;
+}
+
+/* ------------------------------------------------------------------------ */
+
+Bool BlockData_IsMergeableOrient(const BlockData *b1, const BlockData *b2, Bool dir) {
+    if (dir) return BlockData_IsMergeableVert(b1, b2);
+    else return BlockData_IsMergeableHoriz(b1, b2);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -113,7 +142,7 @@ Bool BlockData_IsMergeable(const BlockData *b1, const BlockData *b2) {
 Bool BlockData_IsSwappable(const BlockData *b1, const BlockData *b2) {
     int w = IntCoord_X(b1->br) - IntCoord_X(b1->ul);
     int h = IntCoord_Y(b1->br) - IntCoord_Y(b1->ul);
-    return IntCoord_X(b2->br) - IntCoord_X(b2->ul) == w && IntCoord_Y(b2->br) - IntCoord_Y(b2->ul);
+    return IntCoord_X(b2->br) - IntCoord_X(b2->ul) == w && IntCoord_Y(b2->br) - IntCoord_Y(b2->ul) == h;
 }
 
 /* ------------------------------------------------------------------------ */

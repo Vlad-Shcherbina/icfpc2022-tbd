@@ -289,8 +289,8 @@ BitMap *BitMap_ReadPNGFile(const String *filename) {  /* We need to open the fil
    if ((color_type & 4) && (color_type & 2) && bit_depth == 8) {
       for (y=0; y<height; y++) {
          for (x=0; x<width; x++) {
-            p = PixelColor_FromRGB(row_pointers[y][4*x], row_pointers[y][4*x+1], row_pointers[y][4*x+2]);
-            p.a = 255-row_pointers[y][4*x+3];
+            p = PixelColor_FromRGBA(row_pointers[y][4*x], row_pointers[y][4*x+1], row_pointers[y][4*x+2], 255);
+            p.a = row_pointers[y][4*x+3];
             BitMap_SetPixel(bm,x,y,p);
          }
       }
@@ -298,7 +298,7 @@ BitMap *BitMap_ReadPNGFile(const String *filename) {  /* We need to open the fil
       if (color_type & 2 && bit_depth == 8) {
          for (y=0; y<height; y++) {
             for (x=0; x<width; x++) {
-               p = PixelColor_FromRGB(row_pointers[y][3*x], row_pointers[y][3*x+1], row_pointers[y][3*x+2]);
+               p = PixelColor_FromRGBA(row_pointers[y][3*x], row_pointers[y][3*x+1], row_pointers[y][3*x+2], 255);
                BitMap_SetPixel(bm,x,y,p);
             }
          }
@@ -306,7 +306,7 @@ BitMap *BitMap_ReadPNGFile(const String *filename) {  /* We need to open the fil
       if (color_type == 0 && bit_depth == 8) {
          for (y=0; y<height; y++) {
             for (x=0; x<width; x++) {
-               p = PixelColor_FromRGB(row_pointers[y][x], row_pointers[y][x], row_pointers[y][x]);
+               p = PixelColor_FromRGBA(row_pointers[y][x], row_pointers[y][x], row_pointers[y][x], 255);
                BitMap_SetPixel(bm,x,y,p);
             }
          }
@@ -314,7 +314,7 @@ BitMap *BitMap_ReadPNGFile(const String *filename) {  /* We need to open the fil
       if (color_type == 4 && bit_depth == 8) {
          for (y=0; y<height; y++) {
             for (x=0; x<width; x++) {
-               p = PixelColor_FromRGB(row_pointers[y][x*2], row_pointers[y][x*2], row_pointers[y][x*2]);
+               p = PixelColor_FromRGBA(row_pointers[y][x*2], row_pointers[y][x*2], row_pointers[y][x*2], 255);
                p.a = (255-row_pointers[y][x*2+1]);
                p.a = (p.a & 0xf0) | (p.a >> 4);
                if (p.a == 0xff) p.r = p.g = p.b = 0;
@@ -325,7 +325,7 @@ BitMap *BitMap_ReadPNGFile(const String *filename) {  /* We need to open the fil
       if (bit_depth == 16) {
          for (y=0; y<height; y++) {
             for (x=0; x<width; x++) {
-               p = PixelColor_FromRGB(row_pointers[y][6*x], row_pointers[y][6*x+2], row_pointers[y][6*x+4]);
+               p = PixelColor_FromRGBA(row_pointers[y][6*x], row_pointers[y][6*x+2], row_pointers[y][6*x+4], 255);
 //               p.a = 
                BitMap_SetPixel(bm,x,y,p);
             }
@@ -1380,6 +1380,21 @@ BitMap *BitMap_GetBitMap(const BitMap *org, int x1, int x2, int y1, int y2) {
       }
    }
    return bg;
+}
+
+/*--------------------------------------------------------------------------*/
+
+void BitMap_PutBitMapNoClip(BitMap *dst, const BitMap *sprite, int x1, int y1) {
+   BitMap *bg;
+   int x, y;
+   int w = BitMap_SizeX(sprite);
+   int h = BitMap_SizeY(sprite);
+   
+   for (y=0; y<h; y++) {
+      for (x=0; x<w; x++) {
+          dst->buf[dst->multab[y+y1] + x + x1] = sprite->buf[sprite->multab[y]+x];
+      }
+   }
 }
 
 /*--------------------------------------------------------------------------*/
