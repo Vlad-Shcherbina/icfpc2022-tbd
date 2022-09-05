@@ -183,21 +183,211 @@ struct BrickResult {
 }
 fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) -> BrickResult {
     let _t = crate::stats_timer!("do_bricks").time_it();
-    do_bricks_naive(problem, initial_moves, blueprint)
+    let mut painter = PainterState::new(problem);
+    for m in initial_moves {
+        painter.apply_move(m);
+    }
+    assert_eq!(painter.blocks.len(), 1);
+    let mut block_id = painter.blocks.keys().next().unwrap().clone();
+    let Blueprint { mut ys, mut xss } = blueprint.clone();
+
+    let y1 = ys[0];
+    let y2 = *ys.last().unwrap();
+    if y1 < problem.target.height - y2 {
+        if y1 > 0 {
+            // cut bottom margin
+            block_id = painter.apply_move(&Move::LCut {
+                block_id,
+                orientation: Orientation::Horizontal,
+                line_number: y1,
+            }).new_block_ids[1].clone();
+        }
+        if y2 < problem.target.height {
+            // cut top margin
+            block_id = painter.apply_move(&Move::LCut {
+                block_id,
+                orientation: Orientation::Horizontal,
+                line_number: y2,
+            }).new_block_ids[0].clone();
+        }
+    } else {
+        if y2 < problem.target.height {
+            // cut top margin
+            block_id = painter.apply_move(&Move::LCut {
+                block_id,
+                orientation: Orientation::Horizontal,
+                line_number: y2,
+            }).new_block_ids[0].clone();
+        }
+        if y1 > 0 {
+            // cut bottom margin
+            block_id = painter.apply_move(&Move::LCut {
+                block_id,
+                orientation: Orientation::Horizontal,
+                line_number: y1,
+            }).new_block_ids[1].clone();
+        }
+    }
+
+    loop {
+        let y1;
+        let y2;
+        let mut xs;
+        let cut_bottom;
+        if ys[1] - ys[0] < ys[ys.len() - 1] - ys[ys.len() - 2] {
+            cut_bottom = true;
+            y1 = ys[0];
+            y2 = ys[1];
+            ys.remove(0);
+            xs = xss.remove(0);
+        } else {
+            cut_bottom = false;
+            y1 = ys[ys.len() - 2];
+            y2 = ys[ys.len() - 1];
+            ys.pop().unwrap();
+            xs = xss.pop().unwrap();
+        }
+
+        let mut merge_stack: Vec<BlockId> = vec![];
+        // TODO: hozirontal prunning
+        let x1 = xs[0];
+        let x2 = *xs.last().unwrap();
+
+        let left_to_right = x1 < problem.target.width - x2;
+        if left_to_right && x1 > 0 {
+            // cut left margin
+            let mut ids = painter.apply_move(&Move::LCut {
+                block_id,
+                orientation: Orientation::Vertical,
+                line_number: x1,
+            }).new_block_ids;
+            block_id = ids.pop().unwrap();
+            merge_stack.push(ids.pop().unwrap());
+        }
+        if x2 < problem.target.width {
+            // cut right margin
+            let mut ids = painter.apply_move(&Move::LCut {
+                block_id,
+                orientation: Orientation::Vertical,
+                line_number: x2,
+            }).new_block_ids;
+            merge_stack.push(ids.pop().unwrap());
+            block_id = ids.pop().unwrap();
+        }
+        if !left_to_right && x1 > 0 {
+            // cut left margin
+            let mut ids = painter.apply_move(&Move::LCut {
+                block_id,
+                orientation: Orientation::Vertical,
+                line_number: x1,
+            }).new_block_ids;
+            block_id = ids.pop().unwrap();
+            merge_stack.push(ids.pop().unwrap());
+        }
+
+        // TODO : horizontal cutting
+        loop {
+            let cut_left;
+            let x1;
+            let x2;
+            if xs[1] - xs[0] < xs[xs.len() - 1] - xs[xs.len() - 2] {
+                cut_left = true;
+                x1 = xs[0];
+                x2 = xs[1];
+                xs.remove(0);
+            } else {
+                cut_left = false;
+                x1 = xs[xs.len() - 2];
+                x2 = xs[xs.len() - 1];
+                xs.pop().unwrap();
+            }
+
+            let color = crate::color_util::optimal_color_for_block(
+                &problem.target, &Shape { x1, y1, x2, y2 });
+            let m = ColorMove { block_id: block_id.clone(), color };
+            painter.apply_move(&m);
+
+            if xs.len() == 1 {
+                break;
+            }
+
+            if cut_left {
+                let mut ids = painter.apply_move(&Move::LCut {
+                    block_id,
+                    orientation: Orientation::Vertical,
+                    line_number: x2,
+                }).new_block_ids;
+                block_id = ids.pop().unwrap();
+                merge_stack.push(ids.pop().unwrap());
+            } else {
+                let mut ids = painter.apply_move(&Move::LCut {
+                    block_id,
+                    orientation: Orientation::Vertical,
+                    line_number: x1,
+                }).new_block_ids;
+                merge_stack.push(ids.pop().unwrap());
+                block_id = ids.pop().unwrap();
+            }
+        }
+
+        if ys.len() == 1 {
+            break;
+        }
+
+        // horizonal merging
+        while let Some(id) = merge_stack.pop() {
+            block_id = painter.apply_move(&Move::Merge {
+                block_id1: block_id,
+                block_id2: id,
+            }).new_block_ids[0].clone();
+        }
+
+        if cut_bottom {
+            block_id = painter.apply_move(&Move::LCut {
+                block_id,
+                orientation: Orientation::Horizontal,
+                line_number: y2,
+            }).new_block_ids[1].clone();
+        } else {
+            block_id = painter.apply_move(&Move::LCut {
+                block_id,
+                orientation: Orientation::Horizontal,
+                line_number: y1,
+            }).new_block_ids[0].clone();
+        }
+    }
+
+    let img = painter.render();
+    let dist = image_distance(&problem.target, &img).round() as i64;
+    let score = painter.cost + dist;
+
+    let br = BrickResult {
+        score,
+        cost: painter.cost,
+        dist,
+        moves: painter.moves,
+    };
+
+    let br2 = do_bricks_naive(problem, initial_moves, blueprint);
+
+    assert_eq!(br.dist, br2.dist);
+    if br.cost != br2.cost {
+        eprintln!("cost discrepancy: {} vs {} ({})", br.cost, br2.cost, br.cost - br2.cost);
+    }
+
+    br2
 }
 
 fn do_bricks_naive(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) -> BrickResult {
     let _t = crate::stats_timer!("do_bricks_naive").time_it();
     let mut painter = PainterState::new(problem);
-
     for m in initial_moves {
         painter.apply_move(m);
     }
-
     assert_eq!(painter.blocks.len(), 1);
     let mut block_id = painter.blocks.keys().next().unwrap().clone();
-
     let Blueprint { mut ys, mut xss } = blueprint;
+
     loop {
         let (new_block, _moves) = seg_util::isolate_rect(&mut painter, block_id, Shape {
             x1: 0,
