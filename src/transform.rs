@@ -18,13 +18,6 @@ fn transform_dimensions(width: i32, height: i32, t: &Transformation) -> (i32, i3
     }
 }
 
-fn transform_coords(x: i32, y: i32, t: &Transformation) -> (i32, i32) {
-    match t {
-        Transformation::TransposeXY => (y, x),
-        Transformation::FlipY(h) => (x, h - 1 - y),
-    }
-}
-
 impl Image {
     pub fn transform(&self, t: &Transformation) -> Image {
         let (w, h) = transform_dimensions(self.width, self.height, t);
@@ -102,6 +95,14 @@ fn transform_line_number(line_number: i32, orientation: &Orientation, t: &Transf
     }
 }
 
+fn transform_pcut_coords(x: i32, y: i32, t: &Transformation) -> (i32, i32) {
+    match t {
+        Transformation::TransposeXY => (y, x),
+        Transformation::FlipY(h) => (x, h - y),
+    }
+}
+
+
 //fn dbg_print_map(block_id_map: &HashMap<BlockId, BlockId>) {
 //    for (k, v) in block_id_map {
 //        println!("{} -> {}", k, v);
@@ -117,7 +118,7 @@ fn transform_move(m: &Move, t: &Transformation, block_id_map: &mut HashMap<Block
             x,
             y,
         } => {
-            let (x1, y1) = transform_coords(*x, *y, t);
+            let (x1, y1) = transform_pcut_coords(*x, *y, t);
             let new_block_id = block_id_map[block_id].clone();
             match t {
                 Transformation::TransposeXY => {
@@ -346,9 +347,9 @@ fn test_transform_e2e() {
         ", tr);
 
         // TODO: this test is broken
-        // check_transform_e2e(37, "
-        //     cut [0] [120, 130]
-        //     color [0.1] [123, 34, 55, 255]
-        // ", tr);
+        check_transform_e2e(37, "
+            cut [0] [120, 130]
+            color [0.1] [123, 34, 55, 255]
+        ", tr);
     }
 }
