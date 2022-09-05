@@ -86,7 +86,11 @@ pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: Respo
         let mut problem_id_to_rows: Vec<_> = problem_id_to_rows.into_iter().collect();
         problem_id_to_rows.sort_by_key(|(problem_id, _)| *problem_id);
         let rows: Vec<SolutionRow> = problem_id_to_rows.into_iter().flat_map(|q| q.1.into_iter()).collect();
-        let s = SolutionsTemplate {opts, rows}.render().unwrap();
+        let s = SolutionsTemplate {
+            total_score: rows.iter().map(|r| r.score).sum(),
+            opts,
+            rows,
+        }.render().unwrap();
         return resp.code("200 OK").body(s);
     }
 
@@ -218,6 +222,11 @@ struct SolutionsOpts {
 <a href="?">best</a> |
 <a href="?archive={{ !opts.archive }}">archive (all)</a>
 <hr />
+
+{% if !opts.archive %}
+<p>Total score: {{ total_score }}</p>
+{% endif %}
+
 <table>
 <thead>
 <tr>
@@ -255,6 +264,7 @@ struct SolutionsOpts {
 "#)]
 struct SolutionsTemplate {
     opts: SolutionsOpts,
+    total_score: i64,
     rows: Vec<SolutionRow>,
 }
 
