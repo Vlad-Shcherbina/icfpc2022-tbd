@@ -95,6 +95,7 @@ fn brick_solver() {
                 let local_best_score = &local_best_scores[&problem_id];
                 let shared = &shared;
                 scope.spawn(move || {
+                    let mut wcache = WCache::new();
                     let mut problem = Problem::load(problem_id);
                     if transposed {
                         problem = problem.transform(&TransposeXY);
@@ -112,7 +113,7 @@ fn brick_solver() {
                             Blueprint::random()
                         };
 
-                        let sbr = simulate_bricks(&problem, &initial_moves, blueprint.clone());
+                        let sbr = simulate_bricks(&problem, &initial_moves, blueprint.clone(), &mut wcache);
                         if thread_rng().gen_bool(0.01) {
                             let br = do_bricks(&problem, &initial_moves, blueprint.clone());
                             assert_eq!(sbr.cost, br.cost);
@@ -218,7 +219,7 @@ struct SimulateBrickResult {
     cost: i64,
 }
 
-fn simulate_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) -> SimulateBrickResult {
+fn simulate_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint, wcache: &mut WCache) -> SimulateBrickResult {
     let _t = crate::stats_timer!("simulate_bricks").time_it();
     let mut painter = PainterState::new(problem);
     for m in initial_moves {
@@ -271,9 +272,10 @@ fn simulate_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Bluepri
                 xs.pop().unwrap();
             }
 
-            let cf = crate::color_util::color_freqs(&problem.target, &Shape { x1, y1, x2, y2 });
-            let color = crate::color_util::optimal_color_for_color_freqs(&cf);
-            dist += crate::color_util::color_freqs_distance(&cf, color);
+            // let cf = crate::color_util::color_freqs(&problem.target, &Shape { x1, y1, x2, y2 });
+            // let color = crate::color_util::optimal_color_for_color_freqs(&cf);
+            // dist += crate::color_util::color_freqs_distance(&cf, color);
+            dist += wcache.get_dist(Shape { x1, y1, x2, y2 }, problem);
 
             let dc = problem.cost(problem.base_costs.color, w * h);
             cost += dc;
@@ -647,5 +649,30 @@ fn do_bricks_naive(problem: &Problem, initial_moves: &[Move], blueprint: Bluepri
         cost: painter.cost,
         dist,
         moves: painter.moves,
+    }
+}
+
+struct WCache {
+    shape_to_dist: HashMap<Shape, f64>,
+}
+
+impl WCache {
+    fn new() -> WCache {
+        WCache {
+            shape_to_dist: HashMap::default(),
+        }
+    }
+
+    fn get_dist(&mut self, shape: Shape, problem: &Problem) -> f64 {
+        if let Some(&dist) = self.shape_to_dist.get(&shape) {
+            crate::stats_counter!("wcache/hit").inc();
+            return dist;
+        }
+        crate::stats_counter!("wcache/miss").inc();
+        let cf = crate::color_util::color_freqs(&problem.target, &shape);
+        let color = crate::color_util::optimal_color_for_color_freqs(&cf);
+        let dist = crate::color_util::color_freqs_distance(&cf, color);
+        self.shape_to_dist.insert(shape, dist);
+        dist
     }
 }
