@@ -127,6 +127,8 @@ fn brick_solver() {
                             if sa.transposed == transposed {
                                 best_ys = sa.ys.clone();
                                 eprintln!("problem {}: start from best ys {:?}", problem_id, best_ys);
+                            } else {
+                                return;
                             }
                         }
                     }
