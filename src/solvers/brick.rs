@@ -42,6 +42,8 @@ fn brick_solver() {
     assert!(rest.is_empty(), "unrecognized arguments {:?}", rest);
     let problem_range = crate::util::parse_range(&problems);
 
+    assert_eq!(400 % granularity, 0);
+
     let mut client = crate::db::create_client();
     let rows = client.query("SELECT problem_id, moves_cost + image_distance AS score FROM solutions", &[]).unwrap();
     let mut best_scores: BTreeMap<i32, i64> = problem_range.clone().map(|i| (i, i64::MAX)).collect();
