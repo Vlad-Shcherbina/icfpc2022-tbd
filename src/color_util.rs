@@ -136,6 +136,7 @@ fn modified_weiszfeld(color_freqs: &HashMap<Color, f64>, iterations: i32) -> Col
     }
     // dbg!(y);
 
+    let _t = crate::stats_timer!("modified_weiszfeld/rounding").time_it();
     let mut best_dist = 1e20;
     let mut best_color = Color::default();
     // try to round each component both up and down
