@@ -217,6 +217,7 @@ fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) ->
     let Blueprint { mut ys, mut xss } = blueprint;
 
     let mut cost = painter.cost;
+    let mut dist = 0.0;
 
     // For simplicity, so we don't have to compute cost on margins.
     ys[0] = 0;
@@ -345,8 +346,10 @@ fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) ->
                 xs.pop().unwrap();
             }
 
-            let color = crate::color_util::optimal_color_for_block(
-                &problem.target, &Shape { x1, y1, x2, y2 });
+            let cf = crate::color_util::color_freqs(&problem.target, &Shape { x1, y1, x2, y2 });
+            let color = crate::color_util::optimal_color_for_color_freqs(&cf);
+            dist += crate::color_util::color_freqs_distance(&cf, color);
+
             let m = ColorMove { block_id: block_id.clone(), color };
             let dc2 = painter.apply_move(&m).cost;
             let dc = problem.cost(problem.base_costs.color, w * h);
@@ -419,9 +422,13 @@ fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) ->
         }
     }
 
+    let dist1 = (dist * 0.005).round() as i64;
+
     let img = painter.render();
     let dist = image_distance(&problem.target, &img).round() as i64;
     let score = painter.cost + dist;
+
+    assert_eq!(dist1, dist);
 
     assert_eq!(cost, painter.cost);
 

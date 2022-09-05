@@ -10,7 +10,7 @@ use fxhash::FxHashSet as HashSet;
 use crate::basic::*;
 use crate::image::Image;
 
-fn color_freqs_distance(colors: &HashMap<Color, f64>, color: Color) -> f64 {
+pub fn color_freqs_distance(colors: &HashMap<Color, f64>, color: Color) -> f64 {
     let mut d = 0f64;
     for (k, v) in colors {
         d += color.dist(k) * v;
