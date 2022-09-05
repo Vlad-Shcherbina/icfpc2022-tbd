@@ -734,6 +734,7 @@ impl<'a> PainterState<'a> {
     }
 
     pub fn render(&self) -> Image {
+        let _t = crate::stats_timer!("render").time_it();
         let mut res = Image::new(self.width, self.height, Color::default());
         for block in self.blocks.values() {
             for (shape, pic) in &block.pieces {
