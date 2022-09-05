@@ -84,8 +84,8 @@ fn brick_solver() {
                     eprintln!("problem {}:  our {},  best {}", problem_id, local_best_scores[problem_id].load(SeqCst), best_score);
                 }
 
-                let q = crate::stats_timer!("do_bricks").count.get() as f64 / start.elapsed().as_secs_f64();
-                eprintln!("{} do_bricks per second", q.round() as i64);
+                let q = crate::stats_timer!("simulate_bricks").count.get() as f64 / start.elapsed().as_secs_f64();
+                eprintln!("{} simulate_bricks per second", q.round() as i64);
                 eprintln!();
             }
         });
@@ -111,12 +111,24 @@ fn brick_solver() {
                         } else {
                             Blueprint::random()
                         };
-                        let br = do_bricks(&problem, &initial_moves, blueprint.clone());
+
+                        let sbr = simulate_bricks(&problem, &initial_moves, blueprint.clone());
+                        if thread_rng().gen_bool(0.01) {
+                            let br = do_bricks(&problem, &initial_moves, blueprint.clone());
+                            assert_eq!(sbr.cost, br.cost);
+                            assert!((sbr.dist - br.dist).abs() <= 1);  // just in case there are rounding errors
+                        }
+
                         // eprintln!("{} {}", problem_id, score);
-                        if br.score < local_best_score.load(SeqCst) {
-                            local_best_score.store(br.score, SeqCst);
-                            eprintln!("improvement for problem {}: {}", problem_id, br.score);
-                            best_blueprint = blueprint;
+                        if sbr.score < local_best_score.load(SeqCst) {
+                            local_best_score.store(sbr.score, SeqCst);
+                            eprintln!("improvement for problem {}: {}", problem_id, sbr.score);
+
+                            let br = do_bricks(&problem, &initial_moves, blueprint.clone());
+                            assert_eq!(sbr.cost, br.cost);
+                            assert!((sbr.dist - br.dist).abs() <= 1);  // just in case there are rounding errors
+
+                            best_blueprint = blueprint.clone();
                             let shared = &mut *shared.lock().unwrap();
                             let best_score = shared.best_scores.get_mut(&problem_id).unwrap();
                             if br.score < *best_score {
@@ -196,6 +208,101 @@ impl Blueprint {
         }
         let i = thread_rng().gen_range(0..self.xss.len());
         self.xss[i] = random_seps();
+    }
+}
+
+#[allow(dead_code)]
+struct SimulateBrickResult {
+    score: i64,
+    dist: i64,
+    cost: i64,
+}
+
+fn simulate_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) -> SimulateBrickResult {
+    let _t = crate::stats_timer!("simulate_bricks").time_it();
+    let mut painter = PainterState::new(problem);
+    for m in initial_moves {
+        painter.apply_move(m);
+    }
+    assert_eq!(painter.blocks.len(), 1);
+    let Blueprint { mut ys, mut xss } = blueprint;
+
+    let mut cost = painter.cost;
+    let mut dist = 0.0;
+    drop(painter);
+
+    ys[0] = 0;
+    *ys.last_mut().unwrap() = problem.target.height;
+
+    loop {
+        let h = *ys.last().unwrap() - ys[0];
+        let y1;
+        let y2;
+        let mut xs;
+        if ys[1] - ys[0] < ys[ys.len() - 1] - ys[ys.len() - 2] {
+            y1 = ys[0];
+            y2 = ys[1];
+            ys.remove(0);
+            xs = xss.remove(0);
+        } else {
+            y1 = ys[ys.len() - 2];
+            y2 = ys[ys.len() - 1];
+            ys.pop().unwrap();
+            xs = xss.pop().unwrap();
+        }
+
+        xs[0] = 0;
+        *xs.last_mut().unwrap() = problem.target.width;
+
+        let mut merge_cost = 0;
+
+        // horizontal cutting
+        loop {
+            let w = *xs.last().unwrap() - xs[0];
+            let x1;
+            let x2;
+            if xs[1] - xs[0] < xs[xs.len() - 1] - xs[xs.len() - 2] {
+                x1 = xs[0];
+                x2 = xs[1];
+                xs.remove(0);
+            } else {
+                x1 = xs[xs.len() - 2];
+                x2 = xs[xs.len() - 1];
+                xs.pop().unwrap();
+            }
+
+            let cf = crate::color_util::color_freqs(&problem.target, &Shape { x1, y1, x2, y2 });
+            let color = crate::color_util::optimal_color_for_color_freqs(&cf);
+            dist += crate::color_util::color_freqs_distance(&cf, color);
+
+            let dc = problem.cost(problem.base_costs.color, w * h);
+            cost += dc;
+
+            if xs.len() == 1 {
+                break;
+            }
+
+            let dc = problem.cost(problem.base_costs.lcut, w * h);
+            cost += dc;
+            merge_cost += problem.cost(problem.base_costs.merge, (x2 - x1).max(w - (x2 - x1)) * h);
+        }
+
+        if ys.len() == 1 {
+            break;
+        }
+
+        cost += merge_cost;
+
+        let dc = problem.cost(problem.base_costs.lcut, problem.width * h);
+        cost += dc;
+    }
+
+    let dist = (dist * 0.005).round() as i64;
+
+    SimulateBrickResult {
+        score: dist + cost,
+        cost,
+        dist,
     }
 }
 
