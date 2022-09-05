@@ -381,8 +381,15 @@ fn transform_regr() {
     for m in &moves2 {
         painter2.apply_move(m);
     }
-    // so far all ok
+    let img2 = painter2.render();
 
-    // TODO: but this crashes
-    transform_solution(&moves2, &Transformation::TransposeXY);
+    let moves = transform_solution(&moves2, &Transformation::TransposeXY);
+
+    let mut painter = PainterState::new(&problem);
+    for m in &moves {
+        painter.apply_move(m);
+    }
+    let img = painter.render();
+
+    assert_eq!(img, img2.transform(&Transformation::TransposeXY));
 }
