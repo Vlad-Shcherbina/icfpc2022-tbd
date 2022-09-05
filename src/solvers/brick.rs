@@ -274,7 +274,14 @@ fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) ->
         }
 
         let mut merge_stack: Vec<BlockId> = vec![];
-        // TODO: hozirontal prunning
+
+        // Because we can't support different left and right margins
+        // for different rows. They interfere.
+        xs[0] = 0;
+        *xs.last_mut().unwrap() = problem.target.width;
+
+        /*
+        // horizontal prunning
         let x1 = xs[0];
         let x2 = *xs.last().unwrap();
 
@@ -308,9 +315,9 @@ fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) ->
             }).new_block_ids;
             block_id = ids.pop().unwrap();
             merge_stack.push(ids.pop().unwrap());
-        }
+        }*/
 
-        // TODO : horizontal cutting
+        // horizontal cutting
         loop {
             let cut_left;
             let x1;
