@@ -109,12 +109,12 @@ fn brick_solver() {
                     let initial_cost = painter.cost;
                     let mut best_ys = random_seps();
                     loop {
-                        let ys = if thread_rng().gen_bool(0.5) {
+                        let ys = if thread_rng().gen_bool(0.1) {
+                            random_seps()
+                        } else {
                             let mut ys = best_ys.clone();
                             mutate_sep(&mut ys);
                             ys
-                        } else {
-                            random_seps()
                         };
 
                         let (dp_score, xss) = dp(&problem, ys.clone(), granularity, &mut wcache);
@@ -182,12 +182,29 @@ fn random_seps() -> Vec<i32> {
 }
 
 fn mutate_sep(seps: &mut Vec<i32>) {
-    seps.remove(thread_rng().gen_range(0..seps.len()));
-    loop {
-        let x = thread_rng().gen_range(0..401);
-        if !seps.contains(&x) {
-            seps.push(x);
-            break;
+    if thread_rng().gen_bool(0.5) {
+        let old_x = seps.remove(thread_rng().gen_range(0..seps.len()));
+        loop {
+            let range = if thread_rng().gen_bool(0.5) {
+                0..401
+            } else {
+                (old_x - 10).max(0)..(old_x + 10).min(401)
+            };
+            let x = thread_rng().gen_range(range);
+            if !seps.contains(&x) {
+                seps.push(x);
+                break;
+            }
+        }
+    } else if seps.len() > 2 && thread_rng().gen_bool(0.5) {
+        seps.remove(thread_rng().gen_range(0..seps.len()));
+    } else {
+        loop {
+            let x = thread_rng().gen_range(0..401);
+            if !seps.contains(&x) {
+                seps.push(x);
+                break;
+            }
         }
     }
     seps.sort();
