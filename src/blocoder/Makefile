@@ -22,6 +22,7 @@ OBJECT_FILES +=	\
 	islseq.o \
 	file.o \
 	hashtable.o \
+	lap.o \
 	list.o \
 	memory.o \
 	pixelcolor.o \

@@ -7,6 +7,7 @@
 #include "file.h"
 #include "isl.h"
 #include "islseq.h"
+#include "lap.h"
 #include "memory.h"
 #include "stdfunc.h"
 #include "string.h"
@@ -57,8 +58,9 @@ BloCoder *BloCoder_Create(const char *target_png) {
        int id, x1,y1, x2,y2, r,g,b,a;
        while (!File_Eof(f) && File_Scanf(f, "%i %i,%i %i,%i %i,%i,%i,%i\n", &id, &x1,&y1, &x2,&y2, &r,&g,&b,&a) == 9) {
            blockid nid = { .nof_digits = 0, .digits = id };
-           BlockData *bd = BlockData_CreateRect(nid, x1, y1, x2, y2);
+           BlockData *bd = BlockData_CreateRect(nid, x1, BitMap_SizeY(blocoder->target) - y1, x2, BitMap_SizeY(blocoder->target) - y2);
            BitMap_FillRect(blocoder->canvas, x1, y1, x2, y2, PixelColor_FromRGBA(r, g, b, a));
+//         printf("  loaded block %i with colour %i,%i,%i,%i\n", id, r,g,b,a);
            DArray_Add(blocoder->initial_blockdata, bd);
            if (id > blocoder->master_blockid) blocoder->master_blockid = id+1;
        }
@@ -140,6 +142,16 @@ BlockData *BloCoder_LookUpChildBd(const BloCoder *bl, const BlockData *parent, i
 
 BlockData *BloCoder_LookUpParent(const BloCoder *bl, blockid id) {
     return BloCoder_LookUp(bl, blockid_parentid(id));
+}
+
+/* ------------------------------------------------------------------------ */
+
+BlockData *BloCoder_LookUpByPos(const BloCoder *bl, IntCoord pos) {
+    for (int i=0; i<DArray_NofElems(bl->blockdata); i++) {
+        BlockData *b = DArray_Elem(bl->blockdata, i);
+        if (b->ul == pos) return b;
+    }
+    return NULL;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -431,38 +443,6 @@ BlocUndo *BloCoder_ApplyISL(BloCoder *bl, ISL *isl) {
         SWAP(parent[0]->ul, parent[1]->ul);
         SWAP(parent[0]->br, parent[1]->br);
         SWAP(parent[0]->coord, parent[1]->coord);
-#if 0
-        BlockData *parent[2];
-        int xmin[2], ymin[2], xmax[2], ymax[2];
-        
-        for (int j=0; j<2; j++) {
-            parent[j] = BloCoder_LookUp(bl, isl->swap.id[j]);
-            xmin[j] = IntCoord_X(parent[j]->ul);
-            ymin[j] = IntCoord_Y(parent[j]->ul);
-            xmax[j] = IntCoord_X(parent[j]->br);
-            ymax[j] = IntCoord_Y(parent[j]->br);        }
-        /* Better: loop through list and compare */
-        if (xmax[1] - xmin[1] == xmax[0] - xmin[0] && ymax[1] - ymin[1] == ymax[0] - ymin[0]) {
-            BitMap *a1 = BitMap_GetBitMap(bl->canvas, xmin[0], xmax[0], ymin[0], ymax[0]);
-            BitMap *a2 = BitMap_GetBitMap(bl->canvas, xmin[1], xmax[1], ymin[1], ymax[1]);
-            BitMap_PutBitMap(bl->canvas, a2, xmin[0], ymin[0]);
-            BitMap_PutBitMap(bl->canvas, a1, xmin[1], ymin[1]);
-            BitMap_Destroy(a1);
-            BitMap_Destroy(a2);
-        } else {
-            fprintf(stderr, "SWAP between incompatible regions\n");
-        }
-        undo->score *= bl->target_size;
-        undo->score = 0.5 + (double)undo->score / (double)parent[0]->area;
-        SWAP(parent[0]->ul, parent[1]->ul);
-        SWAP(parent[0]->br, parent[1]->br);
-        SWAP(parent[0]->coord, parent[1]->coord);
-        if (debug) {
-            printf("Swap %li and %li\n", parent[0]->id.digits, parent[1]->id.digits);
-            BlockData_Print(parent[0]);
-            BlockData_Print(parent[1]);
-        }
-#endif
         break; }
     case ISL_MERGE: {
         BlockData *parent[2];
@@ -476,11 +456,13 @@ BlocUndo *BloCoder_ApplyISL(BloCoder *bl, ISL *isl) {
         b->id.digits = bl->master_blockid++;
         DArray_Add(bl->blockdata, b);
         undo->score *= bl->target_size;
-        undo->score = 0.5 + (double)undo->score / MAX(parent[0]->area, parent[1]->area);
-        if (debug) {
-        printf("Merge %i and %li to new id %li\n", parent[0]->id.digits, parent[1]->id.digits, b->id.digits);
-        BlockData_Print(parent[0]);
-        BlockData_Print(parent[1]);
+        undo->score = 0.5 + (double)undo->score / (MAX(parent[0]->area, parent[1]->area));
+        if (debug || undo->score < 0) {
+            printf("Merge %lu and %lu to new id %lu, opscore=%i, target_size=%i, parareas=%i,%i\n", parent[0]->id.digits, parent[1]->id.digits, b->id.digits,
+                isl_cost[isl->opcode], bl->target_size, parent[0]->area, parent[1]->area);
+            
+            BlockData_Print(parent[0]);
+            BlockData_Print(parent[1]);
         }
         /* TODO */
         break; }
@@ -547,48 +529,6 @@ void BloCoder_UndoISL(BloCoder *bl, ISL *isl, const BlocUndo *undo) {
         SWAP(parent[0]->br, parent[1]->br);
         SWAP(parent[0]->coord, parent[1]->coord);
 
-#if 0
-        BlockData *parent[2];
-
-        int xmin[2], ymin[2], xmax[2], ymax[2];
-
-        for (int j=0; j<2; j++) {
-            parent[j] = BloCoder_LookUp(bl, isl->swap.id[j]);
-        }
-        
-        SWAP(parent[0]->ul, parent[1]->ul);
-        SWAP(parent[0]->br, parent[1]->br);
-        SWAP(parent[0]->coord, parent[1]->coord);
-        
-        for (int j=0; j<2; j++) {
-            xmin[j] = IntCoord_X(parent[j]->ul);
-            ymin[j] = IntCoord_X(parent[j]->ul);
-            xmax[j] = IntCoord_X(parent[j]->br);
-            ymax[j] = IntCoord_X(parent[j]->br);
-        }
-
-        if (debug) printf("Canvas score before undo swap %i\n", BloCoder_CanvasScore(bl));
-        BitMap *a2 = BitMap_GetBitMap(bl->canvas, xmin[0], xmax[0], ymin[0], ymax[0]);
-        BitMap *a1 = BitMap_GetBitMap(bl->canvas, xmin[1], xmax[1], ymin[1], ymax[1]);
-        BitMap_PutBitMap(bl->canvas, a1, xmin[0], ymin[0]);
-        BitMap_PutBitMap(bl->canvas, a2, xmin[1], ymin[1]);
-        BitMap_Destroy(a1);
-        BitMap_Destroy(a2);
-        if (debug) printf("Canvas score after undo swap %i\n", BloCoder_CanvasScore(bl));
-#endif
-#if 0
-        /* Better: loop through list and compare */
-        if (xmax[1] - xmin[1] == xmax[0] - xmin[0] && ymax[1] - ymin[1] == ymax[0] - ymin[0]) {
-            BitMap *a1 = BitMap_GetBitMap(bl->canvas, xmin[0], xmax[0], ymin[0], ymax[0]);
-            BitMap *a2 = BitMap_GetBitMap(bl->canvas, xmin[1], xmax[1], ymin[1], ymax[1]);
-            BitMap_PutBitMap(bl->canvas, a2, xmin[0], ymin[0]);
-            BitMap_PutBitMap(bl->canvas, a1, xmin[1], ymin[1]);
-            BitMap_Destroy(a1);
-            BitMap_Destroy(a2);
-        } else {
-            fprintf(stderr, "SWAP between incompatible regions\n");
-        }
-#endif
         break; }
     case ISL_MERGE: {
         BlockData *parent[2];
@@ -675,10 +615,10 @@ int BloCoder_Solver(BloCoder *blo, BlockData *parent, ISL *isl, int *islc, int d
     ISL_Paint(newisl + newislc++, parent->id, avgcol);
     ISL_Paint(newisl + newislc++, parent->id, comcol);
 //    if (depth > 1) {
-        int steplenl = 4;
-        if (depth > 1) steplenl = 7;
-        int steplenp = 11;
-        if (depth > 1) steplenp = MIN(24, MAX(4, (xmax-xmin-2)/2));
+        int steplenl = 3;
+        if (depth > 1) steplenl = 8;
+        int steplenp = 9;
+        if (depth > 1) steplenp = MIN(28, MAX(6, (xmax-xmin-4)/2));
         /* generate lcuts. pcuts */
         for (int l=xmin+2; l<xmax-2; l+=steplenl)
              ISL_LCut(newisl + newislc++, parent->id, 0, l);
@@ -766,6 +706,10 @@ void BloCoder_ApplySeq(BloCoder *blo, ISLSeq *seq) {
     for (int i=0; i<ISLSeq_NofISL(seq); i++) {
         BlocUndo *undo = BloCoder_ApplyISL(blo, ISLSeq_ISL(seq, i));
         seq->opscore += undo->score;
+        if (undo->score < 0) {
+            ISL_Print(ISLSeq_ISL(seq, i));
+            printf(" SCORE ERROR!!\n");        
+        }
         BlocUndo_Destroy(undo);
     }
 
@@ -800,6 +744,7 @@ void BloCoder_ISLPostProcess(const char *filename, ISLSeq *sseq) {
     int score;
     BlockData *parent;
     Bool improved = FALSE;
+    int d = 1;
 
     ISLSeq_CleanRedundantPaints(sseq);
         
@@ -821,7 +766,7 @@ void BloCoder_ISLPostProcess(const char *filename, ISLSeq *sseq) {
                 for (int c=0; c<4; c++) {
 nextdec:
                     if (isl->color.col.v[c] > 1) {
-                        isl->color.col.v[c]--;
+                        isl->color.col.v[c]-=d;
                         score = BloCoder_ScoreSeq(blo, sseq);
                         if (score < bestscore) {
                             ISLSeq_Destroy(bestseq);
@@ -838,7 +783,7 @@ nextdec:
                         isl->color.col.dword = orgcol.dword;
 nextinc:
                     if (isl->color.col.v[c] < 254) {
-                        isl->color.col.v[c]++;
+                        isl->color.col.v[c]+=d;
                         score = BloCoder_ScoreSeq(blo, sseq);
                         if (score < bestscore) {
                             ISLSeq_Destroy(bestseq);
@@ -866,8 +811,8 @@ nextinc:
                         limitx = IntCoord_Y(parent->ul);
                 }
 nextdec2:
-                if (isl->lcut.l > limitx+1) {
-                    isl->lcut.l--;
+                if (isl->lcut.l > limitx+1+2*d) {
+                    isl->lcut.l-=d;
                     score = BloCoder_ScoreSeq(blo, sseq);
                     if (score < bestscore) {
                         ISLSeq_Destroy(bestseq);
@@ -877,8 +822,8 @@ nextdec2:
                         improved = TRUE;
                         goto nextdec2;
                     } else
-                    if (score == bestscore) goto nextdec2;
-                    else
+                  if (score == bestscore) goto nextdec2;
+                  else
                         isl->lcut.l = orgx;
                 } else 
                     isl->lcut.l = orgx;
@@ -891,8 +836,8 @@ nextdec2:
                     else limitx = IntCoord_Y(parent->br);
                 }
 nextinc2:
-                if (isl->lcut.l < limitx-1) {
-                    isl->lcut.l++;
+                if (isl->lcut.l < limitx-1-2*d) {
+                    isl->lcut.l+=d;
                     score = BloCoder_ScoreSeq(blo, sseq);
                     if (score < bestscore) {
                         ISLSeq_Destroy(bestseq);
@@ -902,8 +847,8 @@ nextinc2:
                         improved = TRUE;
                         goto nextinc2;
                     } else
-                    if (score == bestscore) goto nextinc2;
-                    else
+                  if (score == bestscore) goto nextinc2;
+                  else
                         isl->lcut.l = orgx;
                 } else
                     isl->lcut.l = orgx;
@@ -918,8 +863,8 @@ nextinc2:
                 if (parent == NULL) limity = 0;
                 else limity = IntCoord_Y(parent->ul);
 nextdec3:
-                if (isl->pcut.x > limitx+1) {
-                    isl->pcut.x--;
+                if (isl->pcut.x > limitx+3) {
+                    isl->pcut.x-=2;
                     score = BloCoder_ScoreSeq(blo, sseq);
                     if (score < bestscore) {
                         ISLSeq_Destroy(bestseq);
@@ -929,14 +874,14 @@ nextdec3:
                         improved = TRUE;
                         goto nextdec3;
                     } else
-                    if (score == bestscore) goto nextdec3;
-                    else
+                  if (score == bestscore) goto nextdec3;
+                  else
                         isl->pcut.x = orgx;
                 } else
                     isl->pcut.x = orgx;
 nextdec4:
-                if (isl->pcut.y > limity+1) {
-                    isl->pcut.y--;
+                if (isl->pcut.y > limity+2+2*d) {
+                    isl->pcut.y-=d;
                     score = BloCoder_ScoreSeq(blo, sseq);
                     if (score < bestscore) {
                         ISLSeq_Destroy(bestseq);
@@ -946,8 +891,8 @@ nextdec4:
                         improved = TRUE;
                         goto nextdec4;
                     } else
-                    if (score == bestscore) goto nextdec4;
-                    else
+//                  if (score == bestscore) goto nextdec4;
+//                  else
                         isl->pcut.y = orgy;
                 } else
                     isl->pcut.y = orgy;
@@ -957,8 +902,8 @@ nextdec4:
                 if (parent == NULL) limity = BitMap_SizeY(blo->target);
                 else limity = IntCoord_Y(parent->br);                
 nextinc3:
-                if (isl->pcut.x < limitx-1) {
-                    isl->pcut.x++;
+                if (isl->pcut.x < limitx-2-2*d) {
+                    isl->pcut.x+=d;
                     score = BloCoder_ScoreSeq(blo, sseq);
                     if (score < bestscore) {
                         ISLSeq_Destroy(bestseq);
@@ -968,14 +913,14 @@ nextinc3:
                         improved = TRUE;
                         goto nextinc3;
                     } else
-                    if (score == bestscore) goto nextinc3;
-                    else
+                  if (score == bestscore) goto nextinc3;
+                  else
                         isl->pcut.x = orgx;
                 } else
                     isl->pcut.x = orgx;
 nextinc4:
-                if (isl->pcut.y < limity-1) {
-                    isl->pcut.y++;
+                if (isl->pcut.y < limity-2-2*d) {
+                    isl->pcut.y+=d;
                     score = BloCoder_ScoreSeq(blo, sseq);
                     if (score < bestscore) {
                         ISLSeq_Destroy(bestseq);
@@ -984,8 +929,8 @@ nextinc4:
                         orgy = isl->pcut.y;
                         goto nextinc4;
                     } else
-                    if (score == bestscore) goto nextinc4;
-                    else
+                  if (score == bestscore) goto nextinc4;
+                  else
                         isl->pcut.y = orgy;
                 } else
                     isl->pcut.y = orgy;
@@ -1036,57 +981,86 @@ void printsol(int id, int bestscore, ISL *sol, int solc) {
 /* ------------------------------------------------------------------------ */
 
 void BloCoder_Swapper(BloCoder *blo, ISLSeq *bestseq) {
-    Bool swapped = FALSE;
-
     int n = DArray_NofElems(blo->blockdata);
-    int **excluded = Int2_CreateVal(n, n, 0);
+    LAP *lap = LAP_Create(n, n);
+    int baseline = BloCoder_CanvasScore(blo);
+    IntCoord pos[n];
 
-    do {
-        ISLSeq *bestsol = ISLSeq_Create();
-        swapped = FALSE;
-        bestsol->score = bestseq->score;
-        printf("Problem %2i : Attempting swaps, score = %i\n", global_prob_id, bestsol->score);
-        for (int i=0; i<DArray_NofElems(blo->blockdata)-1; i++) {
-            BlockData *bdi = DArray_Elem(blo->blockdata, i);
-            if (bdi->valid) {
-                for (int j=i+1; j<DArray_NofElems(blo->blockdata); j++) {
-                    BlockData *bdj = DArray_Elem(blo->blockdata, j);
-                    if (bdj->valid && !excluded[i][j] && BlockData_IsSwappable(bdi, bdj)) {
-                        ISLSeq *sol = ISLSeq_Create();
-                        ISL *swp = ISL_CreateSwap(bdi->id, bdj->id);
-                        ISLSeq_Add(sol, swp);
-                        int sc1 = BloCoder_CanvasScore(blo);
-                        if (BloCoder_ScoreSeq(blo, sol) < bestsol->score) {
-                            ISLSeq_Destroy(bestsol);                            
-                            bestsol = ISLSeq_Clone(sol);
-                            printf("Problem %2i : Found swaps, score = %i\n", global_prob_id, bestsol->score);
-                            swapped = TRUE;
-                            for (int k=0; k<n; k++) {
-                                excluded[i][k] = excluded[k][i] = FALSE;
-                                excluded[j][k] = excluded[k][j] = FALSE;
-                            }
-                        } else {
-                            excluded[i][j] = excluded[j][i] = TRUE;
-                        }
-                        ISLSeq_Destroy(sol);
-                    }
+    printf("Problem %2i : Calculating optimal swap table, base error is %i\n", global_prob_id, baseline);
+
+    for (int i=0; i<DArray_NofElems(blo->blockdata); i++) { /* This is positions */
+        BlockData *bdi = DArray_Elem(blo->blockdata, i);
+        pos[i] = bdi->ul;
+    }
+    
+    for (int i=0; i<DArray_NofElems(blo->blockdata); i++) {
+        BlockData *bdi = DArray_Elem(blo->blockdata, i);
+        int xpos = IntCoord_X(bdi->ul);
+        int ypos = IntCoord_Y(bdi->ul);
+        int w = IntCoord_X(bdi->br) - IntCoord_X(bdi->ul);
+        int h = IntCoord_Y(bdi->br) - IntCoord_Y(bdi->ul);
+        BitMap *data = BitMap_GetBitMap(blo->canvas, xpos, xpos+w, ypos, ypos+h);
+        
+        if (bdi->valid) {
+            for (int j=0; j<n; j++) {
+                if (i != j) {
+                    int x = IntCoord_X(pos[j]);
+                    int y = IntCoord_Y(pos[j]);
+                    BitMap *bg = BitMap_GetBitMap(blo->canvas, x, x+w, y, y+h);
+                    BitMap_PutBitMap(blo->canvas, data, x, y);
+
+                    int cs = BloCoder_CanvasScore(blo);
+                    int score = cs - baseline + (int)(0.5 + (double)isl_cost[ISL_SWAP]*(double)blo->target_size / (double)w*h);
+                    score += 600;
+                    LAP_SetCost(lap, j, i, score);
+//                  printf(" edge %i %i = %i (%i - %i)\n", i, j, score, cs, baseline);
+                    BitMap_PutBitMap(blo->canvas, bg, x, y);
+                    BitMap_Destroy(bg);
+                } else {
+                    LAP_SetCost(lap, j, i, 0);
                 }
             }
         }
-        if (swapped) {
-            BloCoder_ApplySeq(blo, bestsol);
-            ISLSeq_Append(bestseq, bestsol);
-            bestseq->score = bestsol->score;
-            bestseq->canvas_score = bestsol->canvas_score;
-            bestseq->opscore += bestsol->opscore;
+        BitMap_Destroy(data);
+    }
+
+    printf("Problem %2i : Solving matching\n", global_prob_id);
+    double res = LAP_Minimize(lap);
+    printf("Problem %2i : Bipartite matching, optimal swaps have score %.1f\n", global_prob_id, res);
+    
+    for (int j=0; j<n; j++) {
+        BlockData *bdj = BloCoder_LookUpByPos(blo, pos[j]);
+        int i = LAP_AssignmentForColumn(lap, j);
+        BlockData *bdi = DArray_Elem(blo->blockdata, i);
+        if (bdi != NULL && i != j && bdj != NULL && bdi->ul != pos[j]) {
+            printf("Problem %2i : swapping %i to pos %i\n", global_prob_id, i, j);
+            ISL *swp = ISL_CreateSwap(bdi->id, bdj->id);
+            ISLSeq_Add(bestseq, swp);
+            BlocUndo *undo = BloCoder_ApplyISL(blo, swp);
+            bestseq->opscore += undo->score;
+            BlocUndo_Destroy(undo);
         }
-        ISLSeq_Destroy(bestsol);        
-    } while(swapped);
-    Int2_Destroy(excluded, n);
+    }
+    
+    LAP_Destroy(lap);
 }
 
 /* ------------------------------------------------------------------------ */
+#if 0
+void BloCoder_MergeAll(BloCoder *blo, ISLSeq *bestseq, Bool orientation) {
+    int n = DArray_NofElems(blo->blockdata);
+    IntCoord pos[n];
+    
+    for (int i=0; i<DArray_NofElems(blo->blockdata); i++) { /* This is positions */
+        BlockData *bdi = DArray_Elem(blo->blockdata, i);
+        pos[i] = bdi->ul;
+    }
 
+    qsort(pos, n, sizeof(IntCoord), Int_Compare);
+    
+
+}
+#endif
 void BloCoder_MergeAll(BloCoder *blo, ISLSeq *bestseq, Bool orientation) {
     Bool mergeables = FALSE;
     /*
@@ -1131,7 +1105,9 @@ void BloCoder_MergeAll(BloCoder *blo, ISLSeq *bestseq, Bool orientation) {
                         sol = ISLSeq_Create();
 */
                         ISLSeq_Add(sol, ISL_CreateMerge(bdi->id, bdj->id));
-                        if (BloCoder_ScoreSeq(blo, sol) < bestsol->score) {
+                        BloCoder_ScoreSeq(blo, sol);
+                        sol->score += IntCoord_X(bdi->ul) + IntCoord_Y(bdi->ul);
+                        if (sol->score < bestsol->score) {
                             ISLSeq_Destroy(bestsol);
                             bestsol = ISLSeq_Clone(sol);
                         }
@@ -1174,8 +1150,7 @@ int main(int argc, String **argv) {
     String *picfile = argv[1];
     Bool improved = TRUE;
     ISLSeq *bestseq = ISLSeq_Create();
-    srand(time(0));
-
+ 
     misc_init();
 
     if (argc < 2) {
@@ -1190,14 +1165,20 @@ int main(int argc, String **argv) {
     while (n>=0 && picfile[n] != '/') n--;
     global_prob_id = id = atoi(picfile+n+1);   
     start_time = Std_Time();
+    srand(start_time*1000);
     bestseq->score = BloCoder_CanvasScore(blocoder);
     
     if (DArray_NofElems(blocoder->blockdata) > 1) {
         Bool orientation = rand() & 1;
         BloCoder_Swapper(blocoder, bestseq);
+         
         BloCoder_MergeAll(blocoder, bestseq, orientation);
         BloCoder_MergeAll(blocoder, bestseq, !orientation);
-        printf("Problem %2i : preprocessing done, score=%i (%i ops, %i canvas)\n", bestseq->score, bestseq->opscore, bestseq->canvas_score);
+        ISLSeq_ToFile(bestseq, id);
+
+        BloCoder_Reset(blocoder);
+        BloCoder_ApplySeq(blocoder, bestseq);
+       printf("Problem %2i : preprocessing done, score=%i (%i ops, %i canvas)\n", id, bestseq->score, bestseq->opscore, bestseq->canvas_score);       
     }
     
     while (improved) {
