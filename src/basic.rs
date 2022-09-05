@@ -5,7 +5,7 @@ use crate::image::Image;
 use crate::transform::Transformation;
 use crate::util::project_path;
 use std::cmp::{max, min};
-use std::collections::HashMap;
+use fxhash::FxHashMap as HashMap;
 use std::fmt::{Formatter, Write};
 
 #[derive(Clone, Copy, PartialEq, Eq, Default, Hash, PartialOrd, Ord)]

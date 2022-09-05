@@ -1,5 +1,5 @@
 use std::cmp::{max, min};
-use std::collections::HashSet;
+use fxhash::FxHashSet as HashSet;
 use rand::distributions::Uniform;
 use crate::basic::*;
 // use crate::invocation::{record_this_invocation, Status};
@@ -417,7 +417,7 @@ impl<'a> State<'a> {
     fn new(problem: &'a Problem) -> State<'a> {
         let mut painter = PainterState::new(problem);
         let (root_id, _) = seg_util::merge_all(&mut painter);
-        let initial_colors = HashSet::new();
+        let initial_colors = HashSet::default();
         State {
             problem,
             root_id,

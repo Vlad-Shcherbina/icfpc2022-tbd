@@ -4,7 +4,8 @@
 
 use rand::prelude::*;
 use rand::prelude::*;
-use std::collections::{HashMap, HashSet};
+use fxhash::FxHashMap as HashMap;
+use fxhash::FxHashSet as HashSet;
 
 use crate::basic::*;
 use crate::image::Image;
@@ -26,6 +27,7 @@ pub fn dist_to_color_freqs(color_freqs: &HashMap<Color, f64>, color: Color) -> f
 }
 
 pub fn color_freqs(pic: &Image, shape: &Shape) -> HashMap<Color, f64> {
+    let _t = crate::stats_timer!("color_freqs").time_it();
     let mut colors: HashMap<Color, f64> = HashMap::default();
     for x in shape.x1..shape.x2 {
         for y in shape.y1..shape.y2 {
@@ -318,7 +320,7 @@ pub fn mean_color(img: &Image, shape: Shape) -> Color {
 
 pub fn adjust_colors(problem: &Problem, moves: &Vec<Move>) -> Vec<Move> {
     let mut painter = PainterState::new(problem);
-    let mut color_moves = HashSet::new();
+    let mut color_moves = HashSet::default();
     for mv in moves {
         painter.apply_move(mv);
         if let Move::ColorMove { block_id: _, color } = mv {
@@ -327,7 +329,7 @@ pub fn adjust_colors(problem: &Problem, moves: &Vec<Move>) -> Vec<Move> {
     }
     let mut freqs: HashMap<Color, HashMap<Color, f64>> = color_moves
         .into_iter()
-        .map(|color| (*color, HashMap::new()))
+        .map(|color| (*color, HashMap::default()))
         .collect();
     let img = painter.render();
     for x in 0..img.width {

@@ -1,6 +1,6 @@
 #![allow(unused_imports)]
 
-use std::collections::HashMap;
+use fxhash::FxHashMap as HashMap;
 use rand::prelude::*;
 use crate::basic::*;
 use crate::basic::Move::*;

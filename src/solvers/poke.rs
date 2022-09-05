@@ -1,11 +1,10 @@
 #![allow(clippy::infallible_destructuring_match)]
 
+use fxhash::FxHashMap as HashMap;
 use crate::basic::*;
 use crate::image::{Image};
 use crate::invocation::{record_this_invocation, Status};
 use crate::uploader::upload_solution;
-
-use std::collections::{HashMap};
 
 struct State<'a> {
     painter_state: PainterState<'a>,
@@ -41,7 +40,7 @@ impl<'a> State<'a> {
 
     fn compute_distances(painter_state: &PainterState, target: &Image) -> HashMap<(BlockId, Shape), f64> {
         eprintln!("Computing distances");
-        let mut distances = HashMap::<(BlockId, Shape), f64>::new();
+        let mut distances = HashMap::<(BlockId, Shape), f64>::default();
         let img = painter_state.render();
         for (block_id1, block1) in &painter_state.blocks {
             for block2 in painter_state.blocks.values() {

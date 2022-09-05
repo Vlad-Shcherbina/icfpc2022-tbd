@@ -1,5 +1,5 @@
 // use std::time::SystemTime;
-use std::collections::HashMap;
+use fxhash::FxHashMap as HashMap;
 use askama::Template;
 use postgres::types::Json;
 use crate::{util::DateTime, invocation::Invocation};
@@ -25,7 +25,7 @@ pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: Respo
         };
         let opts = SolutionsOpts { archive };
 
-        let mut problem_id_to_rows: HashMap<i32, Vec<SolutionRow>> = HashMap::new();
+        let mut problem_id_to_rows: HashMap<i32, Vec<SolutionRow>> = HashMap::default();
         let raw_rows = client.query("
             SELECT
                 id,
@@ -107,7 +107,7 @@ pub fn handler(state: &std::sync::Mutex<super::State>, req: Request, resp: Respo
         let problem = Problem::load(problem_id);
         let mut painter = PainterState::new(&problem);
 
-        let mut cost_breakdown: HashMap<&'static str, i64> = HashMap::new();
+        let mut cost_breakdown: HashMap<&'static str, i64> = HashMap::default();
         for m in &moves {
             let c = painter.apply_move(m).cost;
             match m {

@@ -1,4 +1,5 @@
-use std::{cmp::Ordering, collections::HashMap, path::Path};
+use std::{cmp::Ordering, path::Path};
+use fxhash::FxHashMap as HashMap;
 
 use crate::{
     basic::{Color, Problem, Shape},

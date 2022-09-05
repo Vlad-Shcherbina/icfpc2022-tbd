@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::collections::HashMap;
+use fxhash::FxHashMap as HashMap;
 
 use crate::basic::*;
 use crate::image::Image;
@@ -194,7 +194,7 @@ fn transform_move(m: &Move, t: &Transformation, block_id_map: &mut HashMap<Block
 
 pub fn transform_solution(moves: &Vec<Move>, t: &Transformation) -> Vec<Move> {
     let mut res = vec![];
-    let mut block_id_map = HashMap::new();
+    let mut block_id_map = HashMap::default();
     for m in moves {
         res.push(transform_move(m, t, &mut block_id_map));
     }

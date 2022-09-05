@@ -1,6 +1,8 @@
 #![allow(unused_imports)]
 
-use std::collections::{HashSet, HashMap, BTreeMap};
+use fxhash::FxHashMap as HashMap;
+use fxhash::FxHashSet as HashSet;
+use std::collections::BTreeMap;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicI64, Ordering::SeqCst};
 use rand::prelude::*;
@@ -52,7 +54,7 @@ fn brick_solver() {
     let shared = Shared {
         client,
         best_scores,
-        improvements: HashMap::new(),
+        improvements: HashMap::default(),
     };
     let shared = Mutex::new(shared);
 
@@ -138,7 +140,7 @@ fn brick_solver() {
 }
 
 fn random_seps() -> Vec<i32> {
-    let mut res: HashSet<i32> = HashSet::new();
+    let mut res: HashSet<i32> = HashSet::default();
     if thread_rng().gen_bool(0.9) {
         res.insert(0);
         res.insert(400);

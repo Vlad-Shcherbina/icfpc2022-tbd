@@ -1,10 +1,10 @@
-use std::collections::HashMap;
+use fxhash::FxHashMap as HashMap;
 use rand::prelude::*;
 use crate::image::Image;
 use crate::basic::{Shape, Color};
 
 pub fn packing(target: &Image) -> Vec<(Shape, Color)> {
-    let mut cnts: HashMap<Color, i32> = HashMap::new();
+    let mut cnts: HashMap<Color, i32> = HashMap::default();
     for y in 0..target.height {
         for x in 0..target.width {
             *cnts.entry(target.get_pixel(x as i32, y as i32)).or_default() += 1;
@@ -153,7 +153,7 @@ fn rec(i: usize, state: &mut State) {
 
 pub fn packing2(target: &Image) -> Vec<(Shape, Color)> {
     let _t = crate::stats_timer!("packing2").time_it();
-    let mut cnts: HashMap<Color, i32> = HashMap::new();
+    let mut cnts: HashMap<Color, i32> = HashMap::default();
     for y in 0..target.height {
         for x in 0..target.width {
             *cnts.entry(target.get_pixel(x as i32, y as i32)).or_default() += 1;
