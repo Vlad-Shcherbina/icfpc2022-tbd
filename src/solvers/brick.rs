@@ -100,6 +100,7 @@ fn brick_solver() {
                 let local_best_score = &local_best_scores[&problem_id];
                 let shared = &shared;
                 scope.spawn(move || {
+                    let mut dp_cache: DpCache = HashMap::default();
                     let mut wcache = WCache::new();
                     let mut problem = Problem::load(problem_id);
                     if transposed {
@@ -119,7 +120,7 @@ fn brick_solver() {
                             ys
                         };
 
-                        let (dp_score, xss) = dp(&problem, ys.clone(), granularity, &mut wcache);
+                        let (dp_score, xss) = dp(&problem, ys.clone(), granularity, &mut wcache, &mut dp_cache);
 
                         let mut sbr = simulate_bricks(&problem, ys.clone(), xss.clone(), &mut wcache);
                         assert!((sbr.score() as f64 - dp_score) <= 2.0);
@@ -243,7 +244,8 @@ fn dp_demo() {
     let problem = Problem::load(17);
     let mut wcache = WCache::new();
     let ys = vec![0, 200, 400];
-    let (score, xss) = dp(&problem, ys.clone(), granularity, &mut wcache);
+
+    let (score, xss) = dp(&problem, ys.clone(), granularity, &mut wcache, &mut HashMap::default());
     eprintln!("score: {}", score);
     for xs in &xss {
         eprintln!("xs = {:?}", xs)
@@ -267,7 +269,7 @@ fn dp_demo() {
     eprintln!("it took {:?}", start.elapsed());
 }
 
-fn dp(problem: &Problem, mut ys: Vec<i32>, granularity: i32, wcache: &mut WCache) -> (f64, Vec<Vec<i32>>) {
+fn dp(problem: &Problem, mut ys: Vec<i32>, granularity: i32, wcache: &mut WCache, dp_cache: &mut DpCache) -> (f64, Vec<Vec<i32>>) {
     let _t = crate::stats_timer!("dp").time_it();
     let mut score = 0.0;
     ys[0] = 0;
@@ -291,7 +293,7 @@ fn dp(problem: &Problem, mut ys: Vec<i32>, granularity: i32, wcache: &mut WCache
         }
 
         let last = i + 1 == ys.len();
-        let (row_score, xs) = row_dp(problem, y1, y2, yy2 - yy1, !last, granularity, wcache);
+        let (row_score, xs) = row_dp(problem, y1, y2, yy2 - yy1, !last, granularity, wcache, dp_cache);
         xss.push(xs);
         score += row_score;
 
@@ -310,8 +312,18 @@ fn dp(problem: &Problem, mut ys: Vec<i32>, granularity: i32, wcache: &mut WCache
     (score, xss)
 }
 
-fn row_dp(problem: &Problem, y1: i32, y2: i32, h: i32, merge: bool, granularity: i32, wcache: &mut WCache) -> (f64, Vec<i32>) {
+type DpCache = HashMap<(i32, i32, i32, bool), (f64, Vec<i32>)>;
+
+fn row_dp(problem: &Problem, y1: i32, y2: i32, h: i32, merge: bool, granularity: i32, wcache: &mut WCache, dp_cache: &mut DpCache) -> (f64, Vec<i32>) {
     let _t = crate::stats_timer!("row_dp").time_it();
+
+    let cache_key = (y1, y2, h, merge);
+    if let Some(e) = dp_cache.get(&cache_key) {
+        crate::stats_counter!("row_dp/hit").inc();
+        return e.clone();
+    }
+    crate::stats_counter!("row_dp/miss").inc();
+
     let mut best: HashMap<(i32, i32), (f64, Vec<i32>)> = HashMap::default();
 
     for w in 1..=problem.width {
@@ -374,7 +386,9 @@ fn row_dp(problem: &Problem, y1: i32, y2: i32, h: i32, merge: bool, granularity:
 
     let (score, mut xs) = best.remove(&(0, problem.width)).unwrap();
     xs.reverse();
-    (score, xs)
+    let res = (score, xs);
+    dp_cache.insert(cache_key, res.clone());
+    res
 }
 
 impl SimulateBrickResult {
