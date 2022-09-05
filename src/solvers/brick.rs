@@ -89,50 +89,50 @@ fn brick_solver() {
         });
 
         for problem_id in problem_range {
-            let transposed = true;
+            for transposed in [true, false] {
+                let local_best_score = &local_best_scores[&problem_id];
+                let shared = &shared;
+                scope.spawn(move || {
+                    let mut problem = Problem::load(problem_id);
+                    if transposed {
+                        problem = problem.transform(&TransposeXY);
+                    }
 
-            let local_best_score = &local_best_scores[&problem_id];
-            let shared = &shared;
-            scope.spawn(move || {
-                let mut problem = Problem::load(problem_id);
-                if transposed {
-                    problem = problem.transform(&TransposeXY);
-                }
-
-                let mut painter = PainterState::new(&problem);
-                let (_, initial_moves) = seg_util::merge_all(&mut painter);
-                let mut best_blueprint = Blueprint::random();
-                loop {
-                    let blueprint = if thread_rng().gen_bool(0.5) {
-                        let mut b = best_blueprint.clone();
-                        b.mutate();
-                        b
-                    } else {
-                        Blueprint::random()
-                    };
-                    let br = do_bricks(&problem, &initial_moves, blueprint.clone());
-                    // eprintln!("{} {}", problem_id, score);
-                    if br.score < local_best_score.load(SeqCst) {
-                        local_best_score.store(br.score, SeqCst);
-                        eprintln!("improvement for problem {}: {}", problem_id, br.score);
-                        best_blueprint = blueprint;
-                        let shared = &mut *shared.lock().unwrap();
-                        let best_score = shared.best_scores.get_mut(&problem_id).unwrap();
-                        if br.score < *best_score {
-                            eprintln!("new best score for problem {}: {} -> {}", problem_id, *best_score, br.score);
-                            let mut moves = br.moves;
-                            if transposed {
-                                moves = transform_solution(&moves, &TransposeXY);
+                    let mut painter = PainterState::new(&problem);
+                    let (_, initial_moves) = seg_util::merge_all(&mut painter);
+                    let mut best_blueprint = Blueprint::random();
+                    loop {
+                        let blueprint = if thread_rng().gen_bool(0.5) {
+                            let mut b = best_blueprint.clone();
+                            b.mutate();
+                            b
+                        } else {
+                            Blueprint::random()
+                        };
+                        let br = do_bricks(&problem, &initial_moves, blueprint.clone());
+                        // eprintln!("{} {}", problem_id, score);
+                        if br.score < local_best_score.load(SeqCst) {
+                            local_best_score.store(br.score, SeqCst);
+                            eprintln!("improvement for problem {}: {}", problem_id, br.score);
+                            best_blueprint = blueprint;
+                            let shared = &mut *shared.lock().unwrap();
+                            let best_score = shared.best_scores.get_mut(&problem_id).unwrap();
+                            if br.score < *best_score {
+                                eprintln!("new best score for problem {}: {} -> {}", problem_id, *best_score, br.score);
+                                let mut moves = br.moves;
+                                if transposed {
+                                    moves = transform_solution(&moves, &TransposeXY);
+                                }
+                                *best_score = br.score;
+                                let a = SolverArgs {
+                                    transposed,
+                                };
+                                shared.improvements.insert(problem_id, (a, moves));
                             }
-                            *best_score = br.score;
-                            let a = SolverArgs {
-                                transposed,
-                            };
-                            shared.improvements.insert(problem_id, (a, moves));
                         }
                     }
-                }
-            });
+                });
+            }
         }
     });
 }
