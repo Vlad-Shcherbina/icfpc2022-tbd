@@ -24,8 +24,8 @@ struct Shared {
     improvements: HashMap<i32, (SolverArgs, Vec<Move>)>,
 }
 
-#[derive(serde::Serialize)]
-#[derive(Clone)]
+#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
 struct SolverArgs {
     transposed: bool,
     granularity: i32,
@@ -38,6 +38,7 @@ fn brick_solver() {
     let problems: String = pargs.value_from_str("--problem").unwrap();
     let dry_run = pargs.contains("--dry-run");
     let granularity: i32 = pargs.value_from_str("--granularity").unwrap();
+    let start_from_best = pargs.contains("--start-from-best");
     let rest = pargs.finish();
     assert!(rest.is_empty(), "unrecognized arguments {:?}", rest);
     let problem_range = crate::util::parse_range(&problems);
@@ -45,16 +46,25 @@ fn brick_solver() {
     assert_eq!(400 % granularity, 0);
 
     let mut client = crate::db::create_client();
-    let rows = client.query("SELECT problem_id, moves_cost + image_distance AS score FROM solutions", &[]).unwrap();
+    let rows = client.query("SELECT problem_id, moves_cost + image_distance AS score, solver_args FROM solutions", &[]).unwrap();
     let mut best_scores: BTreeMap<i32, i64> = problem_range.clone().map(|i| (i, i64::MAX)).collect();
+    let mut best_solver_args: HashMap<i32, SolverArgs> = HashMap::default();
     for row in rows {
         let problem_id: i32 = row.get("problem_id");
         let score: i64 = row.get("score");
+        let postgres::types::Json::<serde_json::Value>(sa) = row.get("solver_args");
+
         if let Some(e) = best_scores.get_mut(&problem_id) {
             *e = (*e).min(score);
+
+            if let Ok(sa) = serde_json::from_value::<SolverArgs>(sa) {
+                best_solver_args.insert(problem_id, sa);
+            }
         }
     }
     eprintln!("{:?}", best_scores);
+    eprintln!("{:?}", best_solver_args);
+
     let local_best_scores: BTreeMap<i32, AtomicI64> = problem_range.clone().map(|i| (i, AtomicI64::new(i64::MAX))).collect();
     let shared = Shared {
         client,
@@ -99,6 +109,7 @@ fn brick_solver() {
             for transposed in [true, false] {
                 let local_best_score = &local_best_scores[&problem_id];
                 let shared = &shared;
+                let best_solver_args = &best_solver_args;
                 scope.spawn(move || {
                     let mut dp_cache: DpCache = HashMap::default();
                     let mut wcache = WCache::new();
@@ -111,6 +122,15 @@ fn brick_solver() {
                     let (_, initial_moves) = seg_util::merge_all(&mut painter);
                     let initial_cost = painter.cost;
                     let mut best_ys = random_seps();
+                    if start_from_best {
+                        if let Some(sa) = best_solver_args.get(&problem_id) {
+                            if sa.transposed == transposed {
+                                best_ys = sa.ys.clone();
+                                eprintln!("problem {}: start from best ys {:?}", problem_id, best_ys);
+                            }
+                        }
+                    }
+
                     loop {
                         let ys = if thread_rng().gen_bool(0.1) {
                             random_seps()
@@ -314,6 +334,7 @@ fn dp(problem: &Problem, mut ys: Vec<i32>, granularity: i32, wcache: &mut WCache
 
 type DpCache = HashMap<(i32, i32, i32, bool), (f64, Vec<i32>)>;
 
+#[allow(clippy::too_many_arguments)]
 fn row_dp(problem: &Problem, y1: i32, y2: i32, h: i32, merge: bool, granularity: i32, wcache: &mut WCache, dp_cache: &mut DpCache) -> (f64, Vec<i32>) {
     let _t = crate::stats_timer!("row_dp").time_it();
 
