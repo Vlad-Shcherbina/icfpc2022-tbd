@@ -175,6 +175,7 @@ impl Blueprint {
     }
 }
 
+#[allow(dead_code)]
 struct BrickResult {
     score: i64,
     dist: i64,
@@ -189,7 +190,7 @@ fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) ->
     }
     assert_eq!(painter.blocks.len(), 1);
     let mut block_id = painter.blocks.keys().next().unwrap().clone();
-    let Blueprint { mut ys, mut xss } = blueprint.clone();
+    let Blueprint { mut ys, mut xss } = blueprint;
 
     let y1 = ys[0];
     let y2 = *ys.last().unwrap();
@@ -361,23 +362,24 @@ fn do_bricks(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) ->
     let dist = image_distance(&problem.target, &img).round() as i64;
     let score = painter.cost + dist;
 
-    let br = BrickResult {
+    BrickResult {
         score,
         cost: painter.cost,
         dist,
         moves: painter.moves,
-    };
+    }
 
-    let br2 = do_bricks_naive(problem, initial_moves, blueprint);
+    /*let br2 = do_bricks_naive(problem, initial_moves, blueprint);
 
     assert_eq!(br.dist, br2.dist);
     if br.cost != br2.cost {
         eprintln!("cost discrepancy: {} vs {} ({})", br.cost, br2.cost, br.cost - br2.cost);
-    }
+    }*/
 
-    br2
+    // br
 }
 
+#[allow(dead_code)]
 fn do_bricks_naive(problem: &Problem, initial_moves: &[Move], blueprint: Blueprint) -> BrickResult {
     let _t = crate::stats_timer!("do_bricks_naive").time_it();
     let mut painter = PainterState::new(problem);
