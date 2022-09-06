@@ -18,6 +18,7 @@ mod stats;
 mod transform;
 mod uploader;
 mod util;
+mod dump_final_submissions;
 
 crate::entry_point!("hello", hello);
 fn hello() {
