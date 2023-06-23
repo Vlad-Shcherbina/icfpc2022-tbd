@@ -140,14 +140,25 @@ impl<'a> TimerGuard<'a> {
     fn new(timer: &'a Timer) -> TimerGuard<'a> {
         Self {
             timer,
-            start: unsafe { core::arch::x86_64::_rdtsc() },
+            start: rdtsc(),
         }
     }
 }
 
+#[cfg(target_arch = "x86_64")]
+fn rdtsc() -> u64 {
+    unsafe { core::arch::x86_64::_rdtsc() }
+}
+
+#[cfg(target_arch = "aarch64")]
+fn rdtsc() -> u64 {
+    // TODO
+    0
+}
+
 impl Drop for TimerGuard<'_> {
     fn drop(&mut self) {
-        let d = unsafe { core::arch::x86_64::_rdtsc() } - self.start;
+        let d = rdtsc() - self.start;
         self.timer.count.inc_delta(1);
         self.timer.duration.inc_delta(d as i64);
     }
